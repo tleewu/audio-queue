@@ -29,5 +29,8 @@ RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 8080
+# Railway injects PORT at runtime. Health check uses it so the container is only "ready" when the app responds.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["sh", "-c", "curl -f http://127.0.0.1:${PORT}/health || exit 1"]
 # Start server immediately so Railway health checks pass; run migrations in background.
 CMD ["sh", "-c", "npx prisma migrate deploy & exec node dist/index.js"]

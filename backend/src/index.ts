@@ -31,8 +31,9 @@ app.use('/api/auth', authRouter);
 // Protected
 app.use('/api/queue', requireAuth, queueRouter);
 
-app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`Audio Queue backend running on port ${PORT}`);
+const host = '0.0.0.0';
+app.listen(Number(PORT), host, () => {
+  console.log(`Audio Queue backend listening on http://${host}:${PORT}`);
 
   // Run startup cleanup outside the listen callback to avoid
   // unhandled-rejection crashes (Express doesn't await async callbacks)
