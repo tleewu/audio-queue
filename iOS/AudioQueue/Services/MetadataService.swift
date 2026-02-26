@@ -7,7 +7,7 @@ actor MetadataService {
     // Override in development: set AUDIO_QUEUE_BACKEND_URL env var or change this default.
     private let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
-            ?? "https://your-app.railway.app"  // replace after Railway deploy
+            ?? "https://audio-queue-production.up.railway.app"
     }()
 
     struct ResolvedItem: Decodable {

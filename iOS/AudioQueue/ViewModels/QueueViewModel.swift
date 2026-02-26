@@ -9,7 +9,7 @@ final class QueueViewModel: ObservableObject {
     @Published var sortedQueue: [QueueItem] = []
     @Published var isAddingURL = false
 
-    private let appGroupID = "group.com.yourname.audioqueue"
+    private let appGroupID = "group.com.theowu.audioqueue"
     private let pendingKey = "pendingURLs"
 
     // MARK: - URL Add
