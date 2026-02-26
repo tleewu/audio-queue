@@ -31,7 +31,7 @@ app.use('/api/auth', authRouter);
 // Protected
 app.use('/api/queue', requireAuth, queueRouter);
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Audio Queue backend running on port ${PORT}`);
 
   // Run startup cleanup outside the listen callback to avoid
