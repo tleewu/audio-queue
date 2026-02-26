@@ -11,8 +11,10 @@ router.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing required field: url' });
   }
 
+  console.log(`[resolve] ${url.trim()}`);
   try {
     const result = await dispatch(url.trim());
+    console.log(`[resolve] OK sourceType=${result.sourceType} audioURL=${result.audioURL ?? 'none'}`);
     return res.json(result);
   } catch (err) {
     console.error('Resolve error:', err);
