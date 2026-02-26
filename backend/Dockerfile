@@ -29,4 +29,5 @@ RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 8080
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Start server immediately so Railway health checks pass; run migrations in background.
+CMD ["sh", "-c", "npx prisma migrate deploy & exec node dist/index.js"]
