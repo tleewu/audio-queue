@@ -1,9 +1,4 @@
-[build]
-builder = "nixpacks"
-buildCommand = "pip install yt-dlp && npm ci && npm run build"
-
 [deploy]
-startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"

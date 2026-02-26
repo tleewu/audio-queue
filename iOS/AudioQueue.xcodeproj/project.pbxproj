@@ -215,10 +215,10 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					70CFD44A94AB2A970A2BB871 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = "theowu93@gmail.com";
 					};
 					CFC020EADEF5EF5B643B6A53 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = "theowu93@gmail.com";
 					};
 				};
 			};
@@ -316,7 +316,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = "theowu93@gmail.com";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -436,7 +436,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = "theowu93@gmail.com";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
