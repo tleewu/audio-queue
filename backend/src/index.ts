@@ -5,6 +5,16 @@ import queueRouter from './routes/queue';
 import { requireAuth } from './middleware/auth';
 import { prisma } from './lib/prisma';
 
+// Surface silent crashes in Railway logs
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  process.exit(1);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -21,20 +31,25 @@ app.use('/api/auth', authRouter);
 // Protected
 app.use('/api/queue', requireAuth, queueRouter);
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`Audio Queue backend running on port ${PORT}`);
 
-  // Reset stuck-pending items (crashed mid-resolution, > 5 min ago)
-  try {
-    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
-    const { count } = await prisma.queueItem.updateMany({
-      where: { resolveStatus: 'pending', savedAt: { lt: cutoff } },
-      data: { resolveStatus: 'failed', resolveError: 'Server restarted during resolution' },
+  // Run startup cleanup outside the listen callback to avoid
+  // unhandled-rejection crashes (Express doesn't await async callbacks)
+  setTimeout(() => {
+    runStartupCleanup().catch((err) => {
+      console.warn('Startup cleanup failed:', err);
     });
-    if (count > 0) console.log(`Reset ${count} stuck-pending item(s) to failed`);
-  } catch (err) {
-    console.warn('Startup cleanup skipped (DB not yet available?):', (err as Error).message);
-  }
+  }, 1000);
 });
+
+async function runStartupCleanup(): Promise<void> {
+  const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+  const { count } = await prisma.queueItem.updateMany({
+    where: { resolveStatus: 'pending', savedAt: { lt: cutoff } },
+    data: { resolveStatus: 'failed', resolveError: 'Server restarted during resolution' },
+  });
+  if (count > 0) console.log(`Reset ${count} stuck-pending item(s) to failed`);
+}
 
 export default app;
