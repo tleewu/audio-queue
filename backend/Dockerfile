@@ -22,9 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy prisma schema (needed for migrate deploy) + pre-generated client from builder
+# Copy schema and generate the Prisma client for this exact runtime environment
 COPY prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
 
