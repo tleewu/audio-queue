@@ -1,7 +1,7 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface YtDlpInfo {
   title: string;
@@ -18,6 +18,9 @@ export interface YtDlpInfo {
  * Runs yt-dlp and returns parsed JSON info for the given URL.
  * Selects best audio-only format and does NOT download.
  * Throws if yt-dlp exits non-zero or the URL is unsupported.
+ *
+ * Uses execFile (not exec) so args are passed directly — no shell
+ * interpretation of brackets, quotes, or special characters.
  */
 export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpInfo> {
   const args = [
@@ -26,12 +29,12 @@ export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpI
     '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
     '--no-warnings',
     '--quiet',
-    `"${url}"`,
-  ].join(' ');
+    url,
+  ];
 
-  const { stdout } = await execAsync(`yt-dlp ${args}`, {
+  const { stdout } = await execFileAsync('yt-dlp', args, {
     timeout: timeoutMs,
-    maxBuffer: 10 * 1024 * 1024, // 10 MB — some JSON can be large
+    maxBuffer: 10 * 1024 * 1024,
   });
 
   const info = JSON.parse(stdout.trim()) as YtDlpInfo;
