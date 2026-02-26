@@ -16,7 +16,12 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Use 8080 when PORT is unset/invalid so we match Dockerfile EXPOSE and Railway's default.
+const PORT = (() => {
+  const p = process.env.PORT;
+  const n = p ? parseInt(p, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 8080;
+})();
 
 app.use(express.json());
 
@@ -32,7 +37,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/queue', requireAuth, queueRouter);
 
 const host = '0.0.0.0';
-app.listen(Number(PORT), host, () => {
+app.listen(PORT, host, () => {
   console.log(`Audio Queue backend listening on http://${host}:${PORT}`);
 
   // Run startup cleanup outside the listen callback to avoid
