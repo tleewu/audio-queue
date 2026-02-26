@@ -23,7 +23,7 @@ export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpI
   const args = [
     '--dump-json',
     '--no-playlist',
-    '-f', 'bestaudio/best',
+    '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
     '--no-warnings',
     '--quiet',
     `"${url}"`,
