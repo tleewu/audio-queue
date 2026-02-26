@@ -1,5 +1,6 @@
 import { execYtDlp } from '../utils/ytdlp';
 import { resolveRSS } from './rssResolver';
+import { resolvePodcastPlatform } from './podcastIndexResolver';
 
 export type SourceType =
   | 'podcast'
@@ -26,6 +27,22 @@ export interface ResolvedItem {
  * RSS covers standard podcast feeds, Substack, and direct audio file URLs.
  */
 export async function dispatch(url: string): Promise<ResolvedItem> {
+  // 0. Spotify / Apple Podcasts → Podcast Index → RSS
+  if (
+    url.includes('open.spotify.com/show') ||
+    url.includes('open.spotify.com/episode') ||
+    url.includes('podcasts.apple.com')
+  ) {
+    try {
+      const result = await resolvePodcastPlatform(url);
+      if (result) return { ...result, originalURL: url };
+    } catch (podcastErr) {
+      console.log(`Podcast platform resolver failed for ${url}:`, (podcastErr as Error).message);
+    }
+    // Podcast platform URL that didn't resolve → unsupported (open in Safari)
+    return { sourceType: 'unsupported', title: url, audioURL: undefined, originalURL: url };
+  }
+
   // 1. Try yt-dlp (YouTube, SoundCloud, and 1000+ sites)
   try {
     const info = await execYtDlp(url);
