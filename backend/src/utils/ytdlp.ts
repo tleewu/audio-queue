@@ -1,0 +1,44 @@
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export interface YtDlpInfo {
+  title: string;
+  uploader?: string;
+  channel?: string;
+  duration?: number;         // seconds
+  thumbnail?: string;
+  url: string;               // direct audio stream URL
+  extractor: string;         // e.g. "youtube", "soundcloud"
+  webpage_url: string;
+}
+
+/**
+ * Runs yt-dlp and returns parsed JSON info for the given URL.
+ * Selects best audio-only format and does NOT download.
+ * Throws if yt-dlp exits non-zero or the URL is unsupported.
+ */
+export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpInfo> {
+  const args = [
+    '--dump-json',
+    '--no-playlist',
+    '-f', 'bestaudio/best',
+    '--no-warnings',
+    '--quiet',
+    `"${url}"`,
+  ].join(' ');
+
+  const { stdout } = await execAsync(`yt-dlp ${args}`, {
+    timeout: timeoutMs,
+    maxBuffer: 10 * 1024 * 1024, // 10 MB — some JSON can be large
+  });
+
+  const info = JSON.parse(stdout.trim()) as YtDlpInfo;
+
+  if (!info.url) {
+    throw new Error('yt-dlp returned no stream URL');
+  }
+
+  return info;
+}
