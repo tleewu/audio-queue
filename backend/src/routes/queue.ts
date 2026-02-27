@@ -1,6 +1,20 @@
 import { Router, Request, Response } from 'express';
+import { Readable } from 'stream';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
+
+const BACKEND_URL = (process.env.AUDIO_QUEUE_BACKEND_URL ?? 'https://audio-queue-production.up.railway.app').replace(/\/$/, '');
+
+function isGooglevideo(url: string): boolean {
+  return url.includes('googlevideo.com');
+}
+
+function isExpiredYouTubeURL(url: string): boolean {
+  const match = url.match(/[?&]expire=(\d+)/);
+  if (!match) return false;
+  const expiry = parseInt(match[1], 10);
+  return Date.now() / 1000 > expiry - 300; // expire 5 min early as buffer
+}
 
 const router = Router();
 
@@ -10,7 +24,73 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     where: { userId: req.userId! },
     orderBy: { position: 'asc' },
   });
-  res.json(items);
+  // Replace IP-locked googlevideo URLs with our proxy endpoint
+  const transformed = items.map(item => ({
+    ...item,
+    audioURL: item.audioURL && isGooglevideo(item.audioURL)
+      ? `${BACKEND_URL}/api/queue/${item.id}/stream`
+      : item.audioURL,
+  }));
+  res.json(transformed);
+});
+
+// GET /api/queue/:id/stream — proxy YouTube audio so IP-locked URLs work on device
+router.get('/:id/stream', async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const item = await prisma.queueItem.findFirst({
+    where: { id, userId: req.userId! },
+    select: { id: true, audioURL: true, originalURL: true },
+  });
+
+  if (!item?.audioURL) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  let audioURL = item.audioURL;
+
+  // Re-resolve if the stored URL has expired
+  if (isGooglevideo(audioURL) && isExpiredYouTubeURL(audioURL)) {
+    console.log(`Stream: re-resolving expired URL for item ${id}`);
+    try {
+      const resolved = await dispatch(item.originalURL);
+      if (resolved.audioURL) {
+        audioURL = resolved.audioURL;
+        await prisma.queueItem.update({ where: { id }, data: { audioURL } });
+      }
+    } catch (err) {
+      console.error('Stream: re-resolve failed:', err);
+      res.status(502).json({ error: 'Could not refresh stream URL' });
+      return;
+    }
+  }
+
+  const upstreamHeaders: Record<string, string> = {};
+  const range = req.headers['range'];
+  if (range) upstreamHeaders['Range'] = range;
+
+  try {
+    const upstream = await fetch(audioURL, { headers: upstreamHeaders });
+
+    res.status(upstream.status);
+    for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+      const value = upstream.headers.get(header);
+      if (value) res.setHeader(header, value);
+    }
+
+    if (!upstream.body) { res.end(); return; }
+
+    const stream = Readable.fromWeb(upstream.body as any);
+    stream.on('error', (err) => {
+      console.error('Stream pipe error:', err);
+      if (!res.headersSent) res.status(502).end();
+      else res.end();
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('Stream proxy error:', err);
+    if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
+  }
 });
 
 // POST /api/queue — insert pending item, fire-and-forget resolve
