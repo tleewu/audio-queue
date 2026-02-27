@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Readable } from 'stream';
+import { spawn } from 'child_process';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
 
@@ -182,34 +182,44 @@ export async function handleQueueStream(req: Request, res: Response): Promise<vo
     }
   }
 
-  const upstreamHeaders: Record<string, string> = {};
-  const range = req.headers['range'];
-  if (range) upstreamHeaders['Range'] = range;
+  // Re-mux via ffmpeg → fragmented MP4 with empty_moov at start.
+  // This guarantees AVPlayer can parse the container immediately without
+  // needing to seek to the end for the moov atom.
+  console.log(`Stream ${id}: starting ffmpeg for ${audioURL.slice(0, 60)}…`);
 
-  try {
-    const upstream = await fetch(audioURL, { headers: upstreamHeaders });
+  res.setHeader('Content-Type', 'audio/mp4');
 
-    console.log(`Stream ${id}: upstream=${upstream.status} range=${upstreamHeaders['Range'] ?? 'none'} ct=${upstream.headers.get('content-type')} cl=${upstream.headers.get('content-length')} ar=${upstream.headers.get('accept-ranges')}`);
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', audioURL,
+    '-vn',                    // drop video
+    '-c:a', 'copy',           // copy AAC — no re-encode, fast
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+    '-f', 'mp4',
+    'pipe:1',                 // write to stdout
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-    res.status(upstream.status);
-    for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
-      const value = upstream.headers.get(header);
-      if (value) res.setHeader(header, value);
+  // Kill ffmpeg if client disconnects
+  req.on('close', () => ffmpeg.kill('SIGKILL'));
+
+  ffmpeg.stderr.on('data', (chunk: Buffer) => {
+    const line = chunk.toString().trim();
+    // ffmpeg writes normal progress to stderr; only log errors
+    if (/error|failed|invalid/i.test(line)) {
+      console.error(`Stream ${id} ffmpeg: ${line}`);
     }
+  });
 
-    if (!upstream.body) { res.end(); return; }
+  ffmpeg.on('error', (err: Error) => {
+    console.error(`Stream ${id} ffmpeg spawn error:`, err);
+    if (!res.headersSent) res.status(500).json({ error: 'Stream failed' });
+  });
 
-    const stream = Readable.fromWeb(upstream.body as any);
-    stream.on('error', (err) => {
-      console.error('Stream pipe error:', err);
-      if (!res.headersSent) res.status(502).end();
-      else res.end();
-    });
-    stream.pipe(res);
-  } catch (err) {
-    console.error('Stream proxy error:', err);
-    if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
-  }
+  ffmpeg.on('close', (code: number | null) => {
+    console.log(`Stream ${id}: ffmpeg exited code=${code}`);
+    if (!res.writableEnded) res.end();
+  });
+
+  ffmpeg.stdout.pipe(res);
 }
 
 export { resolveInBackground };

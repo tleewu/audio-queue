@@ -13,7 +13,7 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install yt-dlp standalone binary (no Python required)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg && \
     curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
          -o /usr/local/bin/yt-dlp && \
     chmod +x /usr/local/bin/yt-dlp && \
