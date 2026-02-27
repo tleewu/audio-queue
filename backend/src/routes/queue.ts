@@ -189,6 +189,8 @@ export async function handleQueueStream(req: Request, res: Response): Promise<vo
   try {
     const upstream = await fetch(audioURL, { headers: upstreamHeaders });
 
+    console.log(`Stream ${id}: upstream=${upstream.status} range=${upstreamHeaders['Range'] ?? 'none'} ct=${upstream.headers.get('content-type')} cl=${upstream.headers.get('content-length')} ar=${upstream.headers.get('accept-ranges')}`);
+
     res.status(upstream.status);
     for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
       const value = upstream.headers.get(header);
