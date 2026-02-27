@@ -176,15 +176,21 @@ async function fetchFromCobalt(videoId: string, originalUrl: string): Promise<Re
     body: JSON.stringify({
       url: `https://www.youtube.com/watch?v=${videoId}`,
       downloadMode: 'audio',
-      audioFormat: 'best',
+      alwaysProxy: true,    // force tunnel URL, not raw YouTube CDN
     }),
   });
 
-  if (!resp.ok) throw new Error(`cobalt HTTP ${resp.status}`);
+  const body = await resp.text();
+  if (!resp.ok) throw new Error(`cobalt HTTP ${resp.status}: ${body.slice(0, 300)}`);
 
-  const data = (await resp.json()) as CobaltResponse;
+  let data: CobaltResponse;
+  try {
+    data = JSON.parse(body) as CobaltResponse;
+  } catch {
+    throw new Error(`cobalt non-JSON response: ${body.slice(0, 200)}`);
+  }
   if (data.status === 'error') throw new Error(`cobalt error: ${data.error?.code ?? 'unknown'}`);
-  if (!data.url) throw new Error('cobalt returned no URL');
+  if (!data.url) throw new Error(`cobalt unexpected status=${data.status}, no url`);
 
   // cobalt doesn't return metadata; return minimal info.
   // The DB already has title/thumbnail from the initial Piped/Invidious resolve
