@@ -34,65 +34,6 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   res.json(transformed);
 });
 
-// GET /api/queue/:id/stream — proxy YouTube audio so IP-locked URLs work on device
-router.get('/:id/stream', async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const item = await prisma.queueItem.findFirst({
-    where: { id, userId: req.userId! },
-    select: { id: true, audioURL: true, originalURL: true },
-  });
-
-  if (!item?.audioURL) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-
-  let audioURL = item.audioURL;
-
-  // Re-resolve if the stored URL has expired
-  if (isGooglevideo(audioURL) && isExpiredYouTubeURL(audioURL)) {
-    console.log(`Stream: re-resolving expired URL for item ${id}`);
-    try {
-      const resolved = await dispatch(item.originalURL);
-      if (resolved.audioURL) {
-        audioURL = resolved.audioURL;
-        await prisma.queueItem.update({ where: { id }, data: { audioURL } });
-      }
-    } catch (err) {
-      console.error('Stream: re-resolve failed:', err);
-      res.status(502).json({ error: 'Could not refresh stream URL' });
-      return;
-    }
-  }
-
-  const upstreamHeaders: Record<string, string> = {};
-  const range = req.headers['range'];
-  if (range) upstreamHeaders['Range'] = range;
-
-  try {
-    const upstream = await fetch(audioURL, { headers: upstreamHeaders });
-
-    res.status(upstream.status);
-    for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
-      const value = upstream.headers.get(header);
-      if (value) res.setHeader(header, value);
-    }
-
-    if (!upstream.body) { res.end(); return; }
-
-    const stream = Readable.fromWeb(upstream.body as any);
-    stream.on('error', (err) => {
-      console.error('Stream pipe error:', err);
-      if (!res.headersSent) res.status(502).end();
-      else res.end();
-    });
-    stream.pipe(res);
-  } catch (err) {
-    console.error('Stream proxy error:', err);
-    if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
-  }
-});
-
 // POST /api/queue — insert pending item, fire-and-forget resolve
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url?: string };
@@ -205,6 +146,67 @@ async function resolveInBackground(itemId: string, url: string): Promise<void> {
         resolveError: (err as Error).message,
       },
     }).catch(() => {});
+  }
+}
+
+// ─── Public stream proxy (registered in index.ts, no auth required) ──────────
+// Item IDs are cuids (25 random chars) — unguessable without the authenticated
+// GET /api/queue response, so ownership check is unnecessary here.
+export async function handleQueueStream(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const item = await prisma.queueItem.findUnique({
+    where: { id },
+    select: { id: true, audioURL: true, originalURL: true },
+  });
+
+  if (!item?.audioURL) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  let audioURL = item.audioURL;
+
+  // Re-resolve if the stored YouTube URL has expired
+  if (isGooglevideo(audioURL) && isExpiredYouTubeURL(audioURL)) {
+    console.log(`Stream: re-resolving expired URL for item ${id}`);
+    try {
+      const resolved = await dispatch(item.originalURL);
+      if (resolved.audioURL) {
+        audioURL = resolved.audioURL;
+        await prisma.queueItem.update({ where: { id }, data: { audioURL } });
+      }
+    } catch (err) {
+      console.error('Stream: re-resolve failed:', err);
+      res.status(502).json({ error: 'Could not refresh stream URL' });
+      return;
+    }
+  }
+
+  const upstreamHeaders: Record<string, string> = {};
+  const range = req.headers['range'];
+  if (range) upstreamHeaders['Range'] = range;
+
+  try {
+    const upstream = await fetch(audioURL, { headers: upstreamHeaders });
+
+    res.status(upstream.status);
+    for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+      const value = upstream.headers.get(header);
+      if (value) res.setHeader(header, value);
+    }
+
+    if (!upstream.body) { res.end(); return; }
+
+    const stream = Readable.fromWeb(upstream.body as any);
+    stream.on('error', (err) => {
+      console.error('Stream pipe error:', err);
+      if (!res.headersSent) res.status(502).end();
+      else res.end();
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('Stream proxy error:', err);
+    if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
   }
 }
 
