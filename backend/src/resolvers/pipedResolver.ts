@@ -1,37 +1,65 @@
 /**
- * YouTube resolver using public Piped / Invidious instances.
+ * YouTube resolver using public Piped / Invidious / cobalt instances.
  *
- * Both are open-source YouTube front-ends whose APIs return audio stream URLs
- * proxied through their own servers — no IP locking, no bot detection on our end.
- *
- * Strategy:
- *   1. Race all Piped instances (Promise.any, 10s each) — return first success
- *   2. If all Piped are down, race all Invidious instances
- *   3. Throw if everything fails
+ * Strategy (each tier races instances in parallel):
+ *   1. Piped — open-source YT front-end, audio URLs proxied through Piped servers
+ *   2. Invidious — similar project, different codebase and instance pool
+ *   3. cobalt.tools — media extraction service, returns a proxied tunnel URL
  */
 
 import type { ResolvedItem } from './resolver';
 
 const TIMEOUT_MS = 10_000;
 
-// Public Piped API instances.  API: GET {base}/streams/{videoId}
-// Full list at https://github.com/TeamPiped/Piped/wiki/Instances
+// ─── Instance lists ───────────────────────────────────────────────────────────
+
+// https://github.com/TeamPiped/Piped/wiki/Instances
 const PIPED_INSTANCES = [
   'https://pipedapi.kavin.rocks',
   'https://piped-api.garudalinux.org',
   'https://pipedapi.adminforge.de',
   'https://api.piped.yt',
   'https://pipedapi.in.projectsegfau.lt',
+  'https://piped-api.codeberg.page',
+  'https://watchapi.whatever.social',
+  'https://api.piped.privacydev.net',
 ];
 
-// Public Invidious API instances.  API: GET {base}/api/v1/videos/{videoId}
-// Full list at https://api.invidious.io/instances.json?sort_by=health
+// https://api.invidious.io/instances.json
 const INVIDIOUS_INSTANCES = [
   'https://invidious.io.lol',
   'https://invidious.privacyredirect.com',
   'https://invidious.nerdvpn.de',
   'https://inv.nadeko.net',
+  'https://invidious.fdn.fr',
+  'https://invidious.perennialte.ch',
 ];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Race a list of async tasks; log each individual failure so we can diagnose. */
+async function raceWithLogging<T>(
+  label: string,
+  tasks: Array<{ name: string; promise: Promise<T> }>,
+): Promise<T> {
+  const tagged = tasks.map(({ name, promise }) =>
+    promise.catch((err: unknown) => {
+      console.log(`  ${label} [${name}] failed: ${(err as Error).message}`);
+      throw err;
+    }),
+  );
+  return Promise.any(tagged);
+}
 
 // ─── Piped ────────────────────────────────────────────────────────────────────
 
@@ -51,25 +79,14 @@ interface PipedResponse {
 }
 
 async function fetchFromPiped(base: string, videoId: string): Promise<ResolvedItem> {
-  const url = `${base}/streams/${videoId}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  let resp: Response;
-  try {
-    resp = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'AudioQueue/1.0' },
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!resp.ok) throw new Error(`Piped ${base} → ${resp.status}`);
+  const resp = await timedFetch(`${base}/streams/${videoId}`, {
+    headers: { 'User-Agent': 'AudioQueue/1.0' },
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
   const data = (await resp.json()) as PipedResponse;
   if (!Array.isArray(data.audioStreams) || data.audioStreams.length === 0) {
-    throw new Error(`Piped ${base}: no audio streams`);
+    throw new Error('no audio streams');
   }
 
   const m4a = data.audioStreams.filter(
@@ -85,17 +102,16 @@ async function fetchFromPiped(base: string, videoId: string): Promise<ResolvedIt
     audioURL: best.url,
     durationSeconds: data.duration,
     thumbnailURL: data.thumbnailUrl,
-    originalURL: '',   // filled in by caller
+    originalURL: '',
   };
 }
 
 // ─── Invidious ────────────────────────────────────────────────────────────────
 
 interface InvidiousFormat {
-  type: string;     // e.g. "audio/mp4; codecs=\"mp4a.40.2\""
+  type: string;
   url: string;
   bitrate: number;
-  container?: string;
 }
 
 interface InvidiousResponse {
@@ -107,27 +123,15 @@ interface InvidiousResponse {
 }
 
 async function fetchFromInvidious(base: string, videoId: string): Promise<ResolvedItem> {
-  const url = `${base}/api/v1/videos/${videoId}?fields=title,author,lengthSeconds,videoThumbnails,adaptiveFormats`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  let resp: Response;
-  try {
-    resp = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'AudioQueue/1.0' },
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!resp.ok) throw new Error(`Invidious ${base} → ${resp.status}`);
+  const resp = await timedFetch(
+    `${base}/api/v1/videos/${videoId}?fields=title,author,lengthSeconds,videoThumbnails,adaptiveFormats`,
+    { headers: { 'User-Agent': 'AudioQueue/1.0' } },
+  );
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
   const data = (await resp.json()) as InvidiousResponse;
-  const audioOnly = (data.adaptiveFormats ?? []).filter(
-    (f) => f.type.startsWith('audio/'),
-  );
-  if (audioOnly.length === 0) throw new Error(`Invidious ${base}: no audio formats`);
+  const audioOnly = (data.adaptiveFormats ?? []).filter((f) => f.type.startsWith('audio/'));
+  if (audioOnly.length === 0) throw new Error('no audio formats');
 
   const m4a = audioOnly.filter(
     (f) => f.type.includes('audio/mp4') || f.type.includes('mp4a'),
@@ -146,16 +150,58 @@ async function fetchFromInvidious(base: string, videoId: string): Promise<Resolv
     audioURL: best.url,
     durationSeconds: data.lengthSeconds,
     thumbnailURL: thumb,
-    originalURL: '',   // filled in by caller
+    originalURL: '',
+  };
+}
+
+// ─── cobalt ───────────────────────────────────────────────────────────────────
+// cobalt.tools is a media extraction service. It returns a proxied tunnel URL
+// (not an IP-locked YouTube CDN URL), so it's safe to stream through Railway.
+// API: https://github.com/imputnet/cobalt (v7+)
+
+interface CobaltResponse {
+  status: 'tunnel' | 'redirect' | 'picker' | 'error';
+  url?: string;
+  error?: { code: string };
+}
+
+async function fetchFromCobalt(videoId: string, originalUrl: string): Promise<ResolvedItem> {
+  const resp = await timedFetch('https://api.cobalt.tools/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'AudioQueue/1.0',
+    },
+    body: JSON.stringify({
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      downloadMode: 'audio',
+      audioFormat: 'best',
+    }),
+  });
+
+  if (!resp.ok) throw new Error(`cobalt HTTP ${resp.status}`);
+
+  const data = (await resp.json()) as CobaltResponse;
+  if (data.status === 'error') throw new Error(`cobalt error: ${data.error?.code ?? 'unknown'}`);
+  if (!data.url) throw new Error('cobalt returned no URL');
+
+  // cobalt doesn't return metadata; return minimal info.
+  // The DB already has title/thumbnail from the initial Piped/Invidious resolve
+  // (or from the stream retry context).
+  return {
+    sourceType: 'youtube',
+    title: '',        // caller fills from DB
+    publisher: undefined,
+    audioURL: data.url,
+    durationSeconds: undefined,
+    thumbnailURL: undefined,
+    originalURL: '',
   };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Extract YouTube video ID from any standard YouTube URL form.
- * Returns null if the URL is not a recognisable YouTube URL.
- */
 export function extractYouTubeId(url: string): string | null {
   const short = url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
   if (short) return short[1];
@@ -168,44 +214,43 @@ export function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-/**
- * Resolve a YouTube URL via Piped (preferred) or Invidious (fallback).
- * Races all instances of each provider in parallel; returns first success.
- * Throws only if every instance of every provider fails.
- */
 export async function resolveViaPiped(url: string): Promise<ResolvedItem> {
   const videoId = extractYouTubeId(url);
   if (!videoId) throw new Error(`Not a YouTube URL: ${url}`);
 
-  console.log(`YouTube resolver: trying Piped instances for ${videoId}`);
-
-  // Try all Piped instances concurrently; use first success
-  let result: ResolvedItem | null = null;
+  // Tier 1: Piped
+  console.log(`YouTube resolver: trying ${PIPED_INSTANCES.length} Piped instances for ${videoId}`);
   try {
-    result = await Promise.any(
-      PIPED_INSTANCES.map((base) => fetchFromPiped(base, videoId)),
-    );
+    const result = await raceWithLogging('Piped', PIPED_INSTANCES.map((base) => ({
+      name: base,
+      promise: fetchFromPiped(base, videoId),
+    })));
     console.log(`YouTube resolver: Piped succeeded for ${videoId}`);
+    return { ...result, originalURL: url };
   } catch {
-    console.log(`YouTube resolver: all Piped instances failed for ${videoId}, trying Invidious`);
+    console.log(`YouTube resolver: all Piped failed, trying Invidious`);
   }
 
-  if (!result) {
-    result = await Promise.any(
-      INVIDIOUS_INSTANCES.map((base) => fetchFromInvidious(base, videoId)),
-    ).catch(() => {
-      throw new Error(`All Piped and Invidious instances failed for ${videoId}`);
-    });
+  // Tier 2: Invidious
+  console.log(`YouTube resolver: trying ${INVIDIOUS_INSTANCES.length} Invidious instances for ${videoId}`);
+  try {
+    const result = await raceWithLogging('Invidious', INVIDIOUS_INSTANCES.map((base) => ({
+      name: base,
+      promise: fetchFromInvidious(base, videoId),
+    })));
     console.log(`YouTube resolver: Invidious succeeded for ${videoId}`);
+    return { ...result, originalURL: url };
+  } catch {
+    console.log(`YouTube resolver: all Invidious failed, trying cobalt`);
   }
 
-  return {
-    sourceType: result.sourceType ?? 'youtube',
-    title: result.title ?? '',
-    publisher: result.publisher,
-    audioURL: result.audioURL,
-    durationSeconds: result.durationSeconds,
-    thumbnailURL: result.thumbnailURL,
-    originalURL: url,
-  };
+  // Tier 3: cobalt
+  console.log(`YouTube resolver: trying cobalt for ${videoId}`);
+  const result = await fetchFromCobalt(videoId, url).catch((err: unknown) => {
+    throw new Error(
+      `All YouTube resolvers failed for ${videoId}: ${(err as Error).message}`,
+    );
+  });
+  console.log(`YouTube resolver: cobalt succeeded for ${videoId}`);
+  return { ...result, originalURL: url };
 }
