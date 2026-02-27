@@ -154,58 +154,6 @@ async function fetchFromInvidious(base: string, videoId: string): Promise<Resolv
   };
 }
 
-// ─── cobalt ───────────────────────────────────────────────────────────────────
-// cobalt.tools is a media extraction service. It returns a proxied tunnel URL
-// (not an IP-locked YouTube CDN URL), so it's safe to stream through Railway.
-// API: https://github.com/imputnet/cobalt (v7+)
-
-interface CobaltResponse {
-  status: 'tunnel' | 'redirect' | 'picker' | 'error';
-  url?: string;
-  error?: { code: string };
-}
-
-async function fetchFromCobalt(videoId: string, originalUrl: string): Promise<ResolvedItem> {
-  const resp = await timedFetch('https://api.cobalt.tools/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'User-Agent': 'AudioQueue/1.0',
-    },
-    body: JSON.stringify({
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      downloadMode: 'audio',
-      alwaysProxy: true,    // force tunnel URL, not raw YouTube CDN
-    }),
-  });
-
-  const body = await resp.text();
-  if (!resp.ok) throw new Error(`cobalt HTTP ${resp.status}: ${body.slice(0, 300)}`);
-
-  let data: CobaltResponse;
-  try {
-    data = JSON.parse(body) as CobaltResponse;
-  } catch {
-    throw new Error(`cobalt non-JSON response: ${body.slice(0, 200)}`);
-  }
-  if (data.status === 'error') throw new Error(`cobalt error: ${data.error?.code ?? 'unknown'}`);
-  if (!data.url) throw new Error(`cobalt unexpected status=${data.status}, no url`);
-
-  // cobalt doesn't return metadata; return minimal info.
-  // The DB already has title/thumbnail from the initial Piped/Invidious resolve
-  // (or from the stream retry context).
-  return {
-    sourceType: 'youtube',
-    title: '',        // caller fills from DB
-    publisher: undefined,
-    audioURL: data.url,
-    durationSeconds: undefined,
-    thumbnailURL: undefined,
-    originalURL: '',
-  };
-}
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function extractYouTubeId(url: string): string | null {
@@ -239,24 +187,12 @@ export async function resolveViaPiped(url: string): Promise<ResolvedItem> {
 
   // Tier 2: Invidious
   console.log(`YouTube resolver: trying ${INVIDIOUS_INSTANCES.length} Invidious instances for ${videoId}`);
-  try {
-    const result = await raceWithLogging('Invidious', INVIDIOUS_INSTANCES.map((base) => ({
-      name: base,
-      promise: fetchFromInvidious(base, videoId),
-    })));
-    console.log(`YouTube resolver: Invidious succeeded for ${videoId}`);
-    return { ...result, originalURL: url };
-  } catch {
-    console.log(`YouTube resolver: all Invidious failed, trying cobalt`);
-  }
-
-  // Tier 3: cobalt
-  console.log(`YouTube resolver: trying cobalt for ${videoId}`);
-  const result = await fetchFromCobalt(videoId, url).catch((err: unknown) => {
-    throw new Error(
-      `All YouTube resolvers failed for ${videoId}: ${(err as Error).message}`,
-    );
+  const result = await raceWithLogging('Invidious', INVIDIOUS_INSTANCES.map((base) => ({
+    name: base,
+    promise: fetchFromInvidious(base, videoId),
+  }))).catch((err: unknown) => {
+    throw new Error(`All YouTube resolvers failed for ${videoId}: ${(err as Error).message}`);
   });
-  console.log(`YouTube resolver: cobalt succeeded for ${videoId}`);
+  console.log(`YouTube resolver: Invidious succeeded for ${videoId}`);
   return { ...result, originalURL: url };
 }

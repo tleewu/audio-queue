@@ -2,34 +2,52 @@ import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
+import { execYtDlp, hasYouTubeCookies } from '../utils/ytdlp';
 import { extractYouTubeId, resolveViaPiped } from '../resolvers/pipedResolver';
 
 const BACKEND_URL = (process.env.AUDIO_QUEUE_BACKEND_URL ?? 'https://audio-queue-production.up.railway.app').replace(/\/$/, '');
 
 // ─── Stream URL cache ─────────────────────────────────────────────────────────
-// Piped returns proxied audio URLs that are NOT IP-locked. We still cache them
-// to avoid hitting Piped on every seek/retry.  Piped URLs don't embed an expiry
-// so we TTL them at 4 hours (conservative — Piped sessions typically last longer).
+// Cache resolved URLs to avoid hitting yt-dlp/Piped on every request.
+// YouTube CDN URLs embed ?expire= and are IP-locked to Railway's IP — fine
+// since ffmpeg also runs on Railway. Piped URLs use a fixed 4h TTL.
 const streamUrlCache = new Map<string, { url: string; expiresAt: number }>();
-const CACHE_TTL_SECONDS = 4 * 3600;
+const DEFAULT_CACHE_TTL_SECONDS = 4 * 3600;
+
+function urlExpiresAt(url: string): number {
+  const m = url.match(/[?&]expire=(\d+)/);
+  return m
+    ? parseInt(m[1], 10) - 300                                // 5 min before YouTube CDN expiry
+    : Math.floor(Date.now() / 1000) + DEFAULT_CACHE_TTL_SECONDS;
+}
 
 async function getStreamUrl(itemId: string, originalURL: string): Promise<string> {
   const cached = streamUrlCache.get(itemId);
-  if (cached && Date.now() / 1000 < cached.expiresAt - 300) {
-    console.log(`Stream ${itemId}: using cached Piped URL`);
+  if (cached && Date.now() / 1000 < cached.expiresAt) {
+    console.log(`Stream ${itemId}: using cached URL`);
     return cached.url;
   }
 
   if (extractYouTubeId(originalURL)) {
-    console.log(`Stream ${itemId}: resolving via Piped`);
-    const resolved = await resolveViaPiped(originalURL);
-    const expiresAt = Math.floor(Date.now() / 1000) + CACHE_TTL_SECONDS;
-    streamUrlCache.set(itemId, { url: resolved.audioURL!, expiresAt });
-    return resolved.audioURL!;
+    let audioUrl: string;
+
+    if (hasYouTubeCookies()) {
+      // yt-dlp with cookies → IP-locked CDN URL, but ffmpeg runs on same Railway IP
+      console.log(`Stream ${itemId}: resolving via yt-dlp (cookies)`);
+      const info = await execYtDlp(originalURL);
+      audioUrl = info.url;
+    } else {
+      // No cookies → fall back to Piped/Invidious proxied URL
+      console.log(`Stream ${itemId}: resolving via Piped`);
+      const resolved = await resolveViaPiped(originalURL);
+      audioUrl = resolved.audioURL!;
+    }
+
+    streamUrlCache.set(itemId, { url: audioUrl, expiresAt: urlExpiresAt(audioUrl) });
+    return audioUrl;
   }
 
-  // Non-YouTube: the stored audioURL in the DB is already a direct URL (from yt-dlp/RSS).
-  // Fetch it from the DB and return it directly.
+  // Non-YouTube: stored audioURL from DB (yt-dlp/RSS resolved at add-time)
   const item = await prisma.queueItem.findUnique({
     where: { id: itemId },
     select: { audioURL: true },
@@ -142,7 +160,8 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
 async function resolveInBackground(itemId: string, url: string): Promise<void> {
   try {
     const resolved = await dispatch(url);
-    await prisma.queueItem.update({
+    // updateMany is a no-op (not an error) when the item was deleted before resolution finished
+    await prisma.queueItem.updateMany({
       where: { id: itemId },
       data: {
         title: resolved.title || url,
@@ -157,7 +176,7 @@ async function resolveInBackground(itemId: string, url: string): Promise<void> {
     });
   } catch (err) {
     console.error(`Resolution failed for ${itemId}:`, err);
-    await prisma.queueItem.update({
+    await prisma.queueItem.updateMany({
       where: { id: itemId },
       data: {
         resolveStatus: 'failed',

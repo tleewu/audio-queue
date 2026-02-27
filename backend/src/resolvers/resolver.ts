@@ -1,4 +1,4 @@
-import { execYtDlp } from '../utils/ytdlp';
+import { execYtDlp, hasYouTubeCookies } from '../utils/ytdlp';
 import { resolveRSS } from './rssResolver';
 import { resolvePodcastPlatform } from './podcastIndexResolver';
 import { extractYouTubeId, resolveViaPiped } from './pipedResolver';
@@ -44,14 +44,31 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     return { sourceType: 'unsupported', title: url, audioURL: undefined, originalURL: url };
   }
 
-  // 1a. YouTube → Piped API (avoids bot detection and IP-locked CDN URLs)
+  // 1a. YouTube
   if (extractYouTubeId(url)) {
+    // Prefer yt-dlp with cookies — bypasses bot detection reliably.
+    // Falls back to Piped/Invidious when cookies aren't configured.
+    if (hasYouTubeCookies()) {
+      try {
+        const info = await execYtDlp(url);
+        return {
+          sourceType: 'youtube',
+          title: info.title,
+          publisher: info.uploader ?? info.channel,
+          audioURL: info.url,
+          durationSeconds: info.duration,
+          thumbnailURL: info.thumbnail,
+          originalURL: url,
+        };
+      } catch (err) {
+        console.log(`yt-dlp (cookies) failed for ${url}:`, (err as Error).message);
+      }
+    }
     try {
       return await resolveViaPiped(url);
     } catch (pipedErr) {
       console.log(`Piped failed for ${url}:`, (pipedErr as Error).message);
     }
-    // YouTube but Piped failed → unsupported (yt-dlp won't work on Railway either)
     return { sourceType: 'unsupported', title: url, audioURL: undefined, originalURL: url };
   }
 
