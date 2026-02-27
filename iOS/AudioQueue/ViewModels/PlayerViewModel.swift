@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 import Combine
 
 /// Bridges the QueueViewModel (queue order) with AudioEngine (playback).
@@ -34,22 +33,20 @@ final class PlayerViewModel: ObservableObject {
 
     // MARK: - Playback Control
 
-    /// Start playing from the beginning of the scored queue.
-    func playQueue(_ queue: [QueueItem], context: ModelContext, queueVM: QueueViewModel) async {
+    func playQueue(_ queue: [QueueItem], queueVM: QueueViewModel) async {
         guard !queue.isEmpty else { return }
         currentIndex = 0
-        await playItem(queue[currentIndex], context: context, queueVM: queueVM)
+        await playItem(queue[currentIndex], queueVM: queueVM)
     }
 
-    func playItem(_ item: QueueItem, context: ModelContext, queueVM: QueueViewModel) async {
-        // Re-resolve YouTube items at play time (URLs expire)
-        await queueVM.reResolveIfNeeded(item: item, context: context)
-        engine.play(item: item)
+    func playItem(_ item: QueueItem, queueVM: QueueViewModel) async {
+        // Re-resolve YouTube items at play time (URLs expire).
+        // After loadQueue(), fetch the fresh struct from sortedQueue.
+        let fresh = await queueVM.reResolveIfNeeded(item: item)
+        engine.play(item: fresh)
     }
 
     func advanceToNext() {
-        // PlayerViewModel signals need to advance; QueueListView observes and acts.
-        // We post a more specific notification that the view layer listens to.
         NotificationCenter.default.post(name: .playerViewModelAdvance, object: nil)
     }
 }

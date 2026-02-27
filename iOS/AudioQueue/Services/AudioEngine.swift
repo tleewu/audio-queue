@@ -49,6 +49,7 @@ final class AudioEngine: ObservableObject {
 
         let playerItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: playerItem)
+        player.play()
         player.rate = playbackRate
         currentItem = item
         isPlaying = true

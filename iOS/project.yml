@@ -3,12 +3,29 @@ options:
   bundleIdPrefix: com.theowu
   deploymentTarget:
     iOS: "17.0"
-  xcodeVersion: "15.0"
+  xcodeVersion: "15.4"
   generateEmptyDirectories: true
 
 settings:
   SWIFT_VERSION: "5.9"
   DEVELOPMENT_TEAM: "theowu93@gmail.com"  # fill in your Team ID
+
+schemes:
+  AudioQueue:
+    build:
+      targets:
+        AudioQueue: all
+        ShareExtension: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
 
 targets:
   AudioQueue:
@@ -36,14 +53,17 @@ targets:
       path: AudioQueue/AudioQueue.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.yourname.audioqueue
+          - group.com.theowu.audioqueue
+        com.apple.developer.applesignin:
+          - Default
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.yourname.audioqueue
+      PRODUCT_BUNDLE_IDENTIFIER: com.theowu.audioqueue
       SWIFT_VERSION: "5.9"
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: MediaPlayer.framework
-      - sdk: SwiftData.framework
+      - sdk: AuthenticationServices.framework
+      - target: ShareExtension
 
   ShareExtension:
     type: app-extension
@@ -59,17 +79,15 @@ targets:
           NSExtensionAttributes:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsText: 1
+              NSExtensionActivationSupportsText: true
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
     entitlements:
       path: ShareExtension/ShareExtension.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.yourname.audioqueue
+          - group.com.theowu.audioqueue
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.yourname.audioqueue.share
+      PRODUCT_BUNDLE_IDENTIFIER: com.theowu.audioqueue.share
       SWIFT_VERSION: "5.9"
-    dependencies:
-      - target: AudioQueue
-        embed: false
+    dependencies: []

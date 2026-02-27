@@ -1,22 +1,17 @@
 import SwiftUI
-import SwiftData
 
 @main
 struct AudioQueueApp: App {
-    let container: ModelContainer
-
-    init() {
-        do {
-            container = try ModelContainer(for: QueueItem.self)
-        } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
-        }
-    }
+    @StateObject private var authService = AuthService.shared
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .modelContainer(container)
+            if authService.isAuthenticated {
+                ContentView()
+                    .environmentObject(authService)
+            } else {
+                LoginView(authService: authService)
+            }
         }
     }
 }

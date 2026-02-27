@@ -3,41 +3,61 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01331B58B302AE7EE9BBB8F7 /* MetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6498C0EBE8A6F61F73696A5 /* MetadataService.swift */; };
 		064DAAC7715E381DF2BCD672 /* AddURLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 482AA961D68DE6C02E61A031 /* AddURLView.swift */; };
 		0EA292801A252D6B349FE110 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3402887BFDC0729E6BDBBEFE /* PlayerViewModel.swift */; };
+		2137F57076ABB2A3059EA318 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D1707B5478812FEE56738B3 /* AuthenticationServices.framework */; };
 		2266B6EE5E4426D089F73F3E /* QueueListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5625F1416C7336837652F44 /* QueueListView.swift */; };
+		2B7F7338DA434D80CD712995 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E108CFE3A5482C4EB52B8495 /* KeychainService.swift */; };
+		2BDA6A4AEEF9FCD96F0627E2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E445F4D4CA2DD526E49002 /* APIClient.swift */; };
 		360C0C87C679D4BCA0AF65B7 /* QueueAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518B3F99794EBE14F2CF3411 /* QueueAlgorithm.swift */; };
+		39FE9BFF30DE4B82377CA8B1 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2856591144B5337043BD94F8 /* AuthService.swift */; };
 		3AE56F65E12F83F46036CD0A /* QueueRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E3C8E6A2A1C1B0A7C45146 /* QueueRowView.swift */; };
 		3EC2D54B86CB9A0AD02631A5 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E092D304CF082E932690F2E /* MediaPlayer.framework */; };
 		4CD5D72BB5BE5A72985EEFEE /* QueueItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7CDC0DFD8E712D6B5E03BA /* QueueItem.swift */; };
+		598455E15689E1357F40E8DD /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5FFBF0006B841F023012F502 /* AudioQueueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */; };
+		8C1F755DC832298F1B48E246 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138021A7BD8283DF255D9E24 /* LoginView.swift */; };
 		96EAF7BDD24A4E936493609B /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA92B08C53732C0CA102A07 /* PlayerView.swift */; };
 		CC2722CA7E99AFDEDDF18244 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E03C7116EAC43148328D311 /* AudioEngine.swift */; };
 		CDC437CB40C2ECB0BDA54A7B /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D1749C4603A054D99917B6BB /* AVFoundation.framework */; };
 		E0E39B178B8ED59F71AE9345 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E55C4BDA1E4AFF48121B4A8 /* ShareViewController.swift */; };
-		E3529F7B33F67B6E74507996 /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A685ED109864E64EC07CC74 /* SwiftData.framework */; };
 		F5058931E006EA559D8E1336 /* QueueViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4C793E869BA50CD02768EE /* QueueViewModel.swift */; };
 		F8A900E2F8A6EED51243CF24 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BD9A562CB8D7E4F654A010 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		6DECD07198325955AEB5F05C /* PBXContainerItemProxy */ = {
+		FDD97DC19E281B315574C5C0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9714AAD8EA4807606CBF30D4 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 70CFD44A94AB2A970A2BB871;
-			remoteInfo = AudioQueue;
+			remoteGlobalIDString = CFC020EADEF5EF5B643B6A53;
+			remoteInfo = ShareExtension;
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		83D503FF0C7B3B6C2365A820 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				598455E15689E1357F40E8DD /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		138021A7BD8283DF255D9E24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		1E092D304CF082E932690F2E /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
-		2358CD944FF534AD43A27116 /* AudioQueue.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AudioQueue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2358CD944FF534AD43A27116 /* AudioQueue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioQueue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2856591144B5337043BD94F8 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		2E55C4BDA1E4AFF48121B4A8 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		3402887BFDC0729E6BDBBEFE /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		3839FA02DF80893D990CAD70 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -45,18 +65,19 @@
 		518B3F99794EBE14F2CF3411 /* QueueAlgorithm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueAlgorithm.swift; sourceTree = "<group>"; };
 		53BD9A562CB8D7E4F654A010 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		56E3C8E6A2A1C1B0A7C45146 /* QueueRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueRowView.swift; sourceTree = "<group>"; };
-		5A685ED109864E64EC07CC74 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
 		6E03C7116EAC43148328D311 /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
 		8069D9C503EE6442F98C7284 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQueueApp.swift; sourceTree = "<group>"; };
 		8E7CDC0DFD8E712D6B5E03BA /* QueueItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItem.swift; sourceTree = "<group>"; };
+		9D1707B5478812FEE56738B3 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		AFA92B08C53732C0CA102A07 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CFEED3B0B5009C22C40E7F9F /* AudioQueue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AudioQueue.entitlements; sourceTree = "<group>"; };
 		D1749C4603A054D99917B6BB /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		D5625F1416C7336837652F44 /* QueueListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueListView.swift; sourceTree = "<group>"; };
+		E108CFE3A5482C4EB52B8495 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		E40BA1623AB2352F6083F425 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
-		E6498C0EBE8A6F61F73696A5 /* MetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataService.swift; sourceTree = "<group>"; };
+		E5E445F4D4CA2DD526E49002 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		EF4C793E869BA50CD02768EE /* QueueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -67,7 +88,7 @@
 			files = (
 				CDC437CB40C2ECB0BDA54A7B /* AVFoundation.framework in Frameworks */,
 				3EC2D54B86CB9A0AD02631A5 /* MediaPlayer.framework in Frameworks */,
-				E3529F7B33F67B6E74507996 /* SwiftData.framework in Frameworks */,
+				2137F57076ABB2A3059EA318 /* AuthenticationServices.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,8 +107,10 @@
 		55C2F51A3DAFFFCA15973034 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				E5E445F4D4CA2DD526E49002 /* APIClient.swift */,
 				6E03C7116EAC43148328D311 /* AudioEngine.swift */,
-				E6498C0EBE8A6F61F73696A5 /* MetadataService.swift */,
+				2856591144B5337043BD94F8 /* AuthService.swift */,
+				E108CFE3A5482C4EB52B8495 /* KeychainService.swift */,
 				518B3F99794EBE14F2CF3411 /* QueueAlgorithm.swift */,
 			);
 			path = Services;
@@ -149,6 +172,7 @@
 			children = (
 				482AA961D68DE6C02E61A031 /* AddURLView.swift */,
 				53BD9A562CB8D7E4F654A010 /* ContentView.swift */,
+				138021A7BD8283DF255D9E24 /* LoginView.swift */,
 				AFA92B08C53732C0CA102A07 /* PlayerView.swift */,
 				D5625F1416C7336837652F44 /* QueueListView.swift */,
 				56E3C8E6A2A1C1B0A7C45146 /* QueueRowView.swift */,
@@ -159,9 +183,9 @@
 		F48B5E904E1719A490BED0E5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9D1707B5478812FEE56738B3 /* AuthenticationServices.framework */,
 				D1749C4603A054D99917B6BB /* AVFoundation.framework */,
 				1E092D304CF082E932690F2E /* MediaPlayer.framework */,
-				5A685ED109864E64EC07CC74 /* SwiftData.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -175,10 +199,12 @@
 			buildPhases = (
 				81661333883ACC1600001952 /* Sources */,
 				6535D9FC2B7B13768D3639EE /* Frameworks */,
+				83D503FF0C7B3B6C2365A820 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				56F59D33E8CD4229723C8ADF /* PBXTargetDependency */,
 			);
 			name = AudioQueue;
 			packageProductDependencies = (
@@ -196,7 +222,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				796CCCE90F6D574037617A01 /* PBXTargetDependency */,
 			);
 			name = ShareExtension;
 			packageProductDependencies = (
@@ -212,15 +237,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1500;
-				TargetAttributes = {
-					70CFD44A94AB2A970A2BB871 = {
-						DevelopmentTeam = "theowu93@gmail.com";
-					};
-					CFC020EADEF5EF5B643B6A53 = {
-						DevelopmentTeam = "theowu93@gmail.com";
-					};
-				};
+				LastUpgradeCheck = 1540;
 			};
 			buildConfigurationList = 98A7B62B03E8DC16636B0902 /* Build configuration list for PBXProject "AudioQueue" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -232,7 +249,6 @@
 			);
 			mainGroup = 9830F61BD72BAE6B4250C94C;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -255,11 +271,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2BDA6A4AEEF9FCD96F0627E2 /* APIClient.swift in Sources */,
 				064DAAC7715E381DF2BCD672 /* AddURLView.swift in Sources */,
 				CC2722CA7E99AFDEDDF18244 /* AudioEngine.swift in Sources */,
 				5FFBF0006B841F023012F502 /* AudioQueueApp.swift in Sources */,
+				39FE9BFF30DE4B82377CA8B1 /* AuthService.swift in Sources */,
 				F8A900E2F8A6EED51243CF24 /* ContentView.swift in Sources */,
-				01331B58B302AE7EE9BBB8F7 /* MetadataService.swift in Sources */,
+				2B7F7338DA434D80CD712995 /* KeychainService.swift in Sources */,
+				8C1F755DC832298F1B48E246 /* LoginView.swift in Sources */,
 				96EAF7BDD24A4E936493609B /* PlayerView.swift in Sources */,
 				0EA292801A252D6B349FE110 /* PlayerViewModel.swift in Sources */,
 				360C0C87C679D4BCA0AF65B7 /* QueueAlgorithm.swift in Sources */,
@@ -273,10 +292,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		796CCCE90F6D574037617A01 /* PBXTargetDependency */ = {
+		56F59D33E8CD4229723C8ADF /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 70CFD44A94AB2A970A2BB871 /* AudioQueue */;
-			targetProxy = 6DECD07198325955AEB5F05C /* PBXContainerItemProxy */;
+			target = CFC020EADEF5EF5B643B6A53 /* ShareExtension */;
+			targetProxy = FDD97DC19E281B315574C5C0 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -349,6 +368,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -356,7 +376,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.audioqueue.share;
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue.share;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -369,13 +389,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AudioQueue/AudioQueue.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = AudioQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.audioqueue;
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -388,13 +409,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AudioQueue/AudioQueue.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = AudioQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.audioqueue;
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -462,6 +484,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -469,7 +492,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.audioqueue.share;
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue.share;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";

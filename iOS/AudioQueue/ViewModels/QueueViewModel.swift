@@ -1,123 +1,153 @@
 import Foundation
-import SwiftData
 import SwiftUI
 
-/// Manages the queue list: adding items, draining the App Group bridge,
-/// triggering resolution, and computing the scored play order.
+/// Manages the queue list: adding items via the API, draining the App Group bridge,
+/// and computing the scored play order.
 @MainActor
 final class QueueViewModel: ObservableObject {
-    @Published var sortedQueue: [QueueItem] = []
+    @Published var allItems: [QueueItem] = []
     @Published var isAddingURL = false
+
+    /// Unlistened items, scored and sorted for playback
+    var sortedQueue: [QueueItem] {
+        QueueAlgorithm.sorted(allItems)
+    }
+
+    /// Listened items, most recently saved first
+    var archivedItems: [QueueItem] {
+        allItems
+            .filter { $0.isListened }
+            .sorted { $0.savedAt > $1.savedAt }
+    }
 
     private let appGroupID = "group.com.theowu.audioqueue"
     private let pendingKey = "pendingURLs"
 
+    // MARK: - Load
+
+    func loadQueue() async {
+        do {
+            let items = try await APIClient.shared.fetchQueue()
+            allItems = items
+        } catch APIError.unauthorized {
+            AuthService.shared.signOut()
+        } catch {
+            print("loadQueue error:", error)
+        }
+    }
+
     // MARK: - URL Add
 
-    /// Add a URL manually (from AddURLView). Creates a pending QueueItem,
-    /// triggers backend resolution, and inserts into the provided context.
-    func addURL(_ urlString: String, context: ModelContext) async {
+    func addURL(_ urlString: String) async {
         let cleaned = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty, URL(string: cleaned) != nil else { return }
 
-        let existingItems = try? context.fetch(FetchDescriptor<QueueItem>())
-        let nextPosition = (existingItems?.map(\.position).max() ?? -1) + 1
-
-        let item = QueueItem(url: cleaned, position: nextPosition)
-        context.insert(item)
-        try? context.save()
-
-        await resolve(item: item, context: context)
+        do {
+            let item = try await APIClient.shared.addToQueue(url: cleaned)
+            allItems.append(item)
+            startPolling(for: item.id)
+        } catch APIError.unauthorized {
+            AuthService.shared.signOut()
+        } catch {
+            print("addURL error:", error)
+        }
     }
 
     // MARK: - App Group Bridge (Share Extension)
 
-    /// Call this when the app enters the foreground.
-    /// Drains pending URLs written by the Share Extension.
-    func drainPendingURLs(context: ModelContext) async {
+    func drainPendingURLs() async {
         guard let defaults = UserDefaults(suiteName: appGroupID) else { return }
         let pending = defaults.stringArray(forKey: pendingKey) ?? []
         guard !pending.isEmpty else { return }
-
         defaults.removeObject(forKey: pendingKey)
 
-        let existingItems = try? context.fetch(FetchDescriptor<QueueItem>())
-        var nextPosition = (existingItems?.map(\.position).max() ?? -1) + 1
-
-        var newItems: [QueueItem] = []
-        for urlString in pending {
-            let item = QueueItem(url: urlString, position: nextPosition)
-            context.insert(item)
-            newItems.append(item)
-            nextPosition += 1
-        }
-        try? context.save()
-
-        // Resolve all in parallel
         await withTaskGroup(of: Void.self) { group in
-            for item in newItems {
-                group.addTask {
-                    await self.resolve(item: item, context: context)
-                }
+            for urlString in pending {
+                group.addTask { await self.addURL(urlString) }
             }
         }
     }
 
-    // MARK: - Resolution
+    // MARK: - Polling
 
-    func resolve(item: QueueItem, context: ModelContext) async {
-        do {
-            let resolved = try await MetadataService.shared.resolve(url: item.url)
-            item.title = resolved.title.isEmpty ? item.url : resolved.title
-            item.sourceType = resolved.sourceType
-            item.audioURL = resolved.audioURL
-            item.durationSeconds = resolved.durationSeconds
-            item.thumbnailURL = resolved.thumbnailURL
-            item.publisher = resolved.publisher
-            item.resolveStatus = resolved.audioURL != nil ? "resolved" : "failed"
-            item.resolveError = resolved.audioURL == nil ? "No audio stream found" : nil
-        } catch {
-            item.resolveStatus = "failed"
-            item.resolveError = error.localizedDescription
+    private func startPolling(for itemId: String) {
+        Task {
+            for _ in 0..<20 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 s
+                await loadQueue()
+                if let item = sortedQueue.first(where: { $0.id == itemId }),
+                   !item.isPending { break }
+            }
         }
-        try? context.save()
-        refreshSortedQueue(context: context)
     }
 
-    /// Re-resolve a YouTube item at play time (stream URLs expire in ~6 hours).
-    func reResolveIfNeeded(item: QueueItem, context: ModelContext) async {
-        guard item.sourceType == "youtube" else { return }
-        await resolve(item: item, context: context)
-    }
+    // MARK: - Re-resolve YouTube at play time
 
-    // MARK: - Queue Order
-
-    func refreshSortedQueue(context: ModelContext) {
-        let all = (try? context.fetch(FetchDescriptor<QueueItem>())) ?? []
-        sortedQueue = QueueAlgorithm.sorted(all)
+    func reResolveIfNeeded(item: QueueItem) async -> QueueItem {
+        guard item.sourceType == "youtube" else { return item }
+        await loadQueue()
+        return sortedQueue.first(where: { $0.id == item.id }) ?? item
     }
 
     // MARK: - Actions
 
-    func markListened(_ item: QueueItem, context: ModelContext) {
-        item.isListened = true
-        try? context.save()
-        refreshSortedQueue(context: context)
+    func markListened(_ item: QueueItem) {
+        Task {
+            do {
+                _ = try await APIClient.shared.markListened(id: item.id)
+                await loadQueue()
+            } catch APIError.unauthorized {
+                AuthService.shared.signOut()
+            } catch {
+                print("markListened error:", error)
+            }
+        }
     }
 
-    func delete(_ item: QueueItem, context: ModelContext) {
-        context.delete(item)
-        try? context.save()
-        refreshSortedQueue(context: context)
+    func markUnlistened(_ item: QueueItem) {
+        Task {
+            do {
+                _ = try await APIClient.shared.markUnlistened(id: item.id)
+                await loadQueue()
+            } catch APIError.unauthorized {
+                AuthService.shared.signOut()
+            } catch {
+                print("markUnlistened error:", error)
+            }
+        }
     }
 
-    func moveItems(from source: IndexSet, to destination: Int, context: ModelContext) {
+    func delete(_ item: QueueItem) {
+        // Optimistic remove
+        allItems.removeAll { $0.id == item.id }
+        Task {
+            do {
+                try await APIClient.shared.deleteFromQueue(id: item.id)
+            } catch APIError.unauthorized {
+                AuthService.shared.signOut()
+            } catch {
+                await loadQueue() // revert on error
+            }
+        }
+    }
+
+    func moveItems(from source: IndexSet, to destination: Int) {
+        // Work on the sorted (unlistened) subset
         var reordered = sortedQueue
         reordered.move(fromOffsets: source, toOffset: destination)
-        for (idx, item) in reordered.enumerated() {
-            item.position = idx
+        // Update positions in allItems to match new order
+        let reorderedIDs = Set(reordered.map(\.id))
+        allItems = allItems.filter { !reorderedIDs.contains($0.id) } + reordered
+
+        Task {
+            let order = reordered.enumerated().map { ($0.element.id, $0.offset) }
+            do {
+                try await APIClient.shared.reorderQueue(order: order)
+            } catch APIError.unauthorized {
+                AuthService.shared.signOut()
+            } catch {
+                await loadQueue() // revert on error
+            }
         }
-        try? context.save()
-        sortedQueue = reordered
     }
 }

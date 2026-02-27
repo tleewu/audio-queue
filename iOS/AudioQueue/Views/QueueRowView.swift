@@ -2,42 +2,53 @@ import SwiftUI
 
 struct QueueRowView: View {
     let item: QueueItem
+    var showPlayButton: Bool = true
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             thumbnail
             info
             Spacer()
             statusBadge
         }
-        .padding(.vertical, 6)
-        .opacity(item.isListened ? 0.4 : 1.0)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Thumbnail
 
     private var thumbnail: some View {
-        Group {
-            if let urlStr = item.thumbnailURL, let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        placeholderIcon
+        ZStack {
+            Group {
+                if let urlStr = item.thumbnailURL, let url = URL(string: urlStr) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            placeholderIcon
+                        }
                     }
+                } else {
+                    placeholderIcon
                 }
-            } else {
-                placeholderIcon
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            // Play button overlay
+            if showPlayButton && item.isPlayable {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.white)
+                    .shadow(radius: 4)
             }
         }
-        .frame(width: 56, height: 56)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .frame(width: 72, height: 72)
     }
 
     private var placeholderIcon: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.secondary.opacity(0.15))
             Text(item.sourceEmoji)
                 .font(.title2)
@@ -72,16 +83,22 @@ struct QueueRowView: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        switch item.resolveStatus {
-        case "pending":
-            ProgressView()
-                .scaleEffect(0.7)
-        case "failed":
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+        if item.isUnsupported {
+            Image(systemName: "safari")
+                .foregroundStyle(.blue)
                 .font(.caption)
-        default:
-            EmptyView()
+        } else {
+            switch item.resolveStatus {
+            case "pending":
+                ProgressView()
+                    .scaleEffect(0.7)
+            case "failed":
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            default:
+                EmptyView()
+            }
         }
     }
 }

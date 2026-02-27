@@ -10,8 +10,12 @@ import Foundation
 enum QueueAlgorithm {
     static func sorted(_ items: [QueueItem]) -> [QueueItem] {
         items
-            .filter { $0.isPlayable && !$0.isListened }
-            .sorted { score($0) > score($1) }
+            .filter { !$0.isListened }
+            .sorted { lhs, rhs in
+                // Resolved items always before pending/failed
+                if lhs.isPlayable != rhs.isPlayable { return lhs.isPlayable }
+                return score(lhs) > score(rhs)
+            }
     }
 
     static func score(_ item: QueueItem) -> Double {

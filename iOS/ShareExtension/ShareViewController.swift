@@ -1,25 +1,140 @@
 import UIKit
-import Social
 import UniformTypeIdentifiers
 
 /// Share Extension entry point.
 /// Reads the shared URL (or plain text), appends it to the App Group
-/// UserDefaults queue, then closes immediately. The main app drains the
-/// queue on next foreground.
+/// UserDefaults queue, shows a brief confirmation, then closes.
 class ShareViewController: UIViewController {
-    private let appGroupID = "group.com.yourname.audioqueue"
+    private let appGroupID = "group.com.theowu.audioqueue"
     private let pendingKey = "pendingURLs"
+
+    // MARK: - UI Elements
+
+    private let containerView: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor(white: 0.12, alpha: 1)
+        v.layer.cornerRadius = 24
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let iconCircle: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor.systemBlue
+        v.layer.cornerRadius = 32
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let checkmark: UIImageView = {
+        let config = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        let iv = UIImageView(image: UIImage(systemName: "checkmark", withConfiguration: config))
+        iv.tintColor = .white
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
+    private let titleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Added to Queue"
+        l.font = .systemFont(ofSize: 20, weight: .semibold)
+        l.textColor = .white
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let dismissLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Tap to dismiss"
+        l.font = .systemFont(ofSize: 14)
+        l.textColor = UIColor(white: 1, alpha: 0.5)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+
+        setupUI()
+
+        // Start hidden for animation
+        containerView.alpha = 0
+        containerView.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissTapped))
+        view.addGestureRecognizer(tap)
+
         extractURL { [weak self] urlString in
             guard let self, let urlString else {
                 self?.cancel()
                 return
             }
             self.saveURL(urlString)
+            self.showConfirmation()
+        }
+    }
+
+    // MARK: - UI Setup
+
+    private func setupUI() {
+        view.addSubview(containerView)
+        containerView.addSubview(iconCircle)
+        iconCircle.addSubview(checkmark)
+        containerView.addSubview(titleLabel)
+        view.addSubview(dismissLabel)
+
+        NSLayoutConstraint.activate([
+            containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            containerView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.75),
+            containerView.heightAnchor.constraint(equalToConstant: 80),
+
+            iconCircle.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            iconCircle.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            iconCircle.widthAnchor.constraint(equalToConstant: 48),
+            iconCircle.heightAnchor.constraint(equalToConstant: 48),
+
+            checkmark.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
+            checkmark.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
+
+            titleLabel.leadingAnchor.constraint(equalTo: iconCircle.trailingAnchor, constant: 14),
+            titleLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -16),
+
+            dismissLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            dismissLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+        ])
+    }
+
+    // MARK: - Confirmation
+
+    private func showConfirmation() {
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0.5) {
+            self.containerView.alpha = 1
+            self.containerView.transform = .identity
+        }
+
+        // Auto-dismiss after 1.5s
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.animateOut()
+        }
+    }
+
+    private func animateOut() {
+        UIView.animate(withDuration: 0.2, animations: {
+            self.containerView.alpha = 0
+            self.containerView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            self.view.backgroundColor = .clear
+        }) { _ in
             self.complete()
         }
+    }
+
+    @objc private func dismissTapped() {
+        animateOut()
     }
 
     // MARK: - URL Extraction
@@ -31,7 +146,6 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // 1. Try UTType.url first
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.url.identifier) }) {
             provider.loadItem(forTypeIdentifier: UTType.url.identifier) { item, _ in
                 let urlString: String?
@@ -47,7 +161,6 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // 2. Fallback: plain text (user shared a URL as text)
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) }) {
             provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) { item, _ in
                 let urlString: String?

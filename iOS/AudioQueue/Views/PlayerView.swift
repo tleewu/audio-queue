@@ -3,7 +3,6 @@ import SwiftUI
 struct PlayerView: View {
     @ObservedObject var playerVM: PlayerViewModel
     @ObservedObject var queueVM: QueueViewModel
-    @Environment(\.modelContext) private var context
 
     @State private var isExpanded = false
     @GestureState private var dragOffset: CGFloat = 0
@@ -230,25 +229,27 @@ struct PlayerView: View {
                 Button {
                     engine.setRate(rate)
                 } label: {
-                    Text(formatRate(rate))
-                        .font(.caption)
-                        .fontWeight(engine.playbackRate == rate ? .bold : .regular)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            engine.playbackRate == rate
-                                ? Color.accentColor.opacity(0.15)
-                                : Color.clear
-                        )
-                        .clipShape(Capsule())
+                    speedRateLabel(rate)
                 }
-                .foregroundStyle(engine.playbackRate == rate ? .accentColor : .secondary)
+                .foregroundStyle(engine.playbackRate == rate ? Color.accentColor : .secondary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(Color.secondary.opacity(0.08))
         .clipShape(Capsule())
+    }
+
+    private func speedRateLabel(_ rate: Float) -> some View {
+        let isSelected = engine.playbackRate == rate
+        let bg: Color = isSelected ? Color.accentColor.opacity(0.15) : Color.clear
+        return Text(formatRate(rate))
+            .font(.caption)
+            .fontWeight(isSelected ? .bold : .regular)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(bg)
+            .clipShape(Capsule())
     }
 
     // MARK: - Helpers

@@ -1,8 +1,6 @@
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var context
     @StateObject private var queueVM = QueueViewModel()
     @StateObject private var playerVM = PlayerViewModel()
 
@@ -10,15 +8,17 @@ struct ContentView: View {
         NavigationStack {
             QueueListView(queueVM: queueVM, playerVM: playerVM)
         }
+        .toolbar(.hidden, for: .navigationBar)
         .task {
-            queueVM.refreshSortedQueue(context: context)
-            await queueVM.drainPendingURLs(context: context)
+            await queueVM.loadQueue()
+            await queueVM.drainPendingURLs()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
         ) { _ in
             Task {
-                await queueVM.drainPendingURLs(context: context)
+                await queueVM.loadQueue()
+                await queueVM.drainPendingURLs()
             }
         }
     }
