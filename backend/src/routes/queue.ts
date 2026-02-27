@@ -2,18 +2,33 @@ import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
+import { execYtDlp } from '../utils/ytdlp';
 
 const BACKEND_URL = (process.env.AUDIO_QUEUE_BACKEND_URL ?? 'https://audio-queue-production.up.railway.app').replace(/\/$/, '');
 
-function isGooglevideo(url: string): boolean {
-  return url.includes('googlevideo.com');
-}
+// ─── CDN URL cache ────────────────────────────────────────────────────────────
+// yt-dlp resolves a fresh YouTube CDN URL (signed with this container's IP)
+// once per item per deployment. ffmpeg then fetches directly from the CDN URL,
+// so there's no IP mismatch and no yt-dlp overhead on repeat plays.
+const cdnUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
-function isExpiredYouTubeURL(url: string): boolean {
-  const match = url.match(/[?&]expire=(\d+)/);
-  if (!match) return false;
-  const expiry = parseInt(match[1], 10);
-  return Date.now() / 1000 > expiry - 300; // expire 5 min early as buffer
+async function getCdnUrl(itemId: string, originalURL: string): Promise<string> {
+  const cached = cdnUrlCache.get(itemId);
+  if (cached && Date.now() / 1000 < cached.expiresAt - 300) {
+    console.log(`Stream ${itemId}: using cached CDN URL`);
+    return cached.url;
+  }
+
+  console.log(`Stream ${itemId}: resolving fresh CDN URL via yt-dlp`);
+  const info = await execYtDlp(originalURL);
+
+  const expireMatch = info.url.match(/[?&]expire=(\d+)/);
+  const expiresAt = expireMatch
+    ? parseInt(expireMatch[1], 10)
+    : Math.floor(Date.now() / 1000) + 5 * 3600;
+
+  cdnUrlCache.set(itemId, { url: info.url, expiresAt });
+  return info.url;
 }
 
 const router = Router();
@@ -24,10 +39,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     where: { userId: req.userId! },
     orderBy: { position: 'asc' },
   });
-  // Replace IP-locked googlevideo URLs with our proxy endpoint
+  // YouTube CDN URLs are IP-locked; route through the stream proxy instead
   const transformed = items.map(item => ({
     ...item,
-    audioURL: item.audioURL && isGooglevideo(item.audioURL)
+    audioURL: item.sourceType === 'youtube' && item.audioURL
       ? `${BACKEND_URL}/api/queue/${item.id}/stream`
       : item.audioURL,
   }));
@@ -42,7 +57,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Determine next position
   const last = await prisma.queueItem.findFirst({
     where: { userId: req.userId! },
     orderBy: { position: 'desc' },
@@ -60,9 +74,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     },
   });
 
-  // Fire-and-forget resolution
   resolveInBackground(item.id, url);
-
   res.status(201).json(item);
 });
 
@@ -96,7 +108,6 @@ router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
       })
     )
   );
-
   res.json({ ok: true });
 });
 
@@ -150,60 +161,47 @@ async function resolveInBackground(itemId: string, url: string): Promise<void> {
 }
 
 // ─── Public stream proxy (registered in index.ts, no auth required) ──────────
-// Item IDs are cuids (25 random chars) — unguessable without the authenticated
-// GET /api/queue response, so ownership check is unnecessary here.
+// Item IDs are cuids — unguessable without the authenticated GET /api/queue.
+// Flow: getCdnUrl (yt-dlp, cached) → ffmpeg (re-mux to fMP4) → iOS AVPlayer.
 export async function handleQueueStream(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   const item = await prisma.queueItem.findUnique({
     where: { id },
-    select: { id: true, audioURL: true, originalURL: true },
+    select: { originalURL: true },
   });
 
-  if (!item?.audioURL) {
+  if (!item) {
     res.status(404).json({ error: 'Not found' });
     return;
   }
 
-  let audioURL = item.audioURL;
-
-  // Re-resolve if the stored YouTube URL has expired
-  if (isGooglevideo(audioURL) && isExpiredYouTubeURL(audioURL)) {
-    console.log(`Stream: re-resolving expired URL for item ${id}`);
-    try {
-      const resolved = await dispatch(item.originalURL);
-      if (resolved.audioURL) {
-        audioURL = resolved.audioURL;
-        await prisma.queueItem.update({ where: { id }, data: { audioURL } });
-      }
-    } catch (err) {
-      console.error('Stream: re-resolve failed:', err);
-      res.status(502).json({ error: 'Could not refresh stream URL' });
-      return;
-    }
+  let cdnUrl: string;
+  try {
+    cdnUrl = await getCdnUrl(id, item.originalURL);
+  } catch (err) {
+    console.error(`Stream ${id}: yt-dlp failed:`, err);
+    res.status(502).json({ error: 'Could not resolve stream URL' });
+    return;
   }
 
-  // Re-mux via ffmpeg → fragmented MP4 with empty_moov at start.
-  // This guarantees AVPlayer can parse the container immediately without
-  // needing to seek to the end for the moov atom.
-  console.log(`Stream ${id}: starting ffmpeg for ${audioURL.slice(0, 60)}…`);
-
+  console.log(`Stream ${id}: ffmpeg from CDN URL`);
   res.setHeader('Content-Type', 'audio/mp4');
 
+  // Re-mux to fragmented MP4: puts empty_moov at the very start so AVPlayer
+  // can parse codec info immediately without scanning the entire file.
   const ffmpeg = spawn('ffmpeg', [
-    '-i', audioURL,
-    '-vn',                    // drop video
-    '-c:a', 'copy',           // copy AAC — no re-encode, fast
+    '-i', cdnUrl,
+    '-vn',
+    '-c:a', 'copy',      // no re-encoding — just container swap
     '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
     '-f', 'mp4',
-    'pipe:1',                 // write to stdout
+    'pipe:1',
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-  // Kill ffmpeg if client disconnects
   req.on('close', () => ffmpeg.kill('SIGKILL'));
 
   ffmpeg.stderr.on('data', (chunk: Buffer) => {
     const line = chunk.toString().trim();
-    // ffmpeg writes normal progress to stderr; only log errors
     if (/error|failed|invalid/i.test(line)) {
       console.error(`Stream ${id} ffmpeg: ${line}`);
     }
@@ -215,7 +213,7 @@ export async function handleQueueStream(req: Request, res: Response): Promise<vo
   });
 
   ffmpeg.on('close', (code: number | null) => {
-    console.log(`Stream ${id}: ffmpeg exited code=${code}`);
+    console.log(`Stream ${id}: done (ffmpeg code=${code})`);
     if (!res.writableEnded) res.end();
   });
 
