@@ -1,8 +1,5 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,32 +14,20 @@ export interface YtDlpInfo {
   webpage_url: string;
 }
 
-// Write YOUTUBE_COOKIES env var to a temp file once per process lifetime.
-// undefined = not yet checked; null = env var not set; string = file path.
-let cookieFilePath: string | null | undefined = undefined;
-
-function getCookieFilePath(): string | null {
-  if (cookieFilePath !== undefined) return cookieFilePath;
-
-  const cookies = process.env.YOUTUBE_COOKIES?.trim();
-  if (!cookies) {
-    cookieFilePath = null;
-    return null;
-  }
-
-  const path = join(tmpdir(), 'yt-cookies.txt');
-  writeFileSync(path, cookies, 'utf-8');
-  cookieFilePath = path;
-  console.log('ytdlp: cookie file written to', path);
-  return path;
-}
-
 /**
- * Returns true if YOUTUBE_COOKIES is configured in the environment.
- * Used by callers to decide whether to try yt-dlp for YouTube.
+ * Extract YouTube video ID from any standard YouTube URL form.
+ * Returns null if the URL is not a recognisable YouTube URL.
  */
-export function hasYouTubeCookies(): boolean {
-  return !!process.env.YOUTUBE_COOKIES?.trim();
+export function extractYouTubeId(url: string): string | null {
+  const short = url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
+  if (short) return short[1];
+
+  const long = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/,
+  );
+  if (long) return long[1];
+
+  return null;
 }
 
 /**
@@ -52,10 +37,6 @@ export function hasYouTubeCookies(): boolean {
  *
  * Uses execFile (not exec) so args are passed directly — no shell
  * interpretation of brackets, quotes, or special characters.
- *
- * When YOUTUBE_COOKIES is set, passes --cookies <file> to yt-dlp so
- * that a real browser session is used, bypassing YouTube bot detection
- * on Railway's datacenter IP.
  */
 export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpInfo> {
   const args = [
@@ -65,14 +46,8 @@ export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpI
     '--extractor-args', 'youtube:player_client=tv_embedded',
     '--no-warnings',
     '--quiet',
+    url,
   ];
-
-  const cookiePath = getCookieFilePath();
-  if (cookiePath) {
-    args.push('--cookies', cookiePath);
-  }
-
-  args.push(url);
 
   const { stdout } = await execFileAsync('yt-dlp', args, {
     timeout: timeoutMs,

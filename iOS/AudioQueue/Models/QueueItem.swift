@@ -24,6 +24,8 @@ extension QueueItem {
     var isPending:  Bool { resolveStatus == "pending" }
     var isPlayable: Bool { isResolved && audioURL != nil }
     var isUnsupported: Bool { sourceType == "unsupported" }
+    /// YouTube items with no RSS audio match: resolved but opens in YouTube app instead of playing in-app
+    var isOpenInApp: Bool { isUnsupported || (sourceType == "youtube" && audioURL == nil) }
 
     var formattedDuration: String? {
         guard let secs = durationSeconds, secs > 0 else { return nil }

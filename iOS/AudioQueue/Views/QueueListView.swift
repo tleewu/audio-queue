@@ -206,7 +206,7 @@ struct QueueListView: View {
     // MARK: - Tap Handling
 
     private func handleTap(_ item: QueueItem) {
-        if item.isUnsupported {
+        if item.isOpenInApp {
             if let url = URL(string: item.originalURL) {
                 UIApplication.shared.open(url)
             }

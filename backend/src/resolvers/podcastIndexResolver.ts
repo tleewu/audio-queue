@@ -4,6 +4,7 @@ import Parser from 'rss-parser';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { resolveRSS } from './rssResolver';
 import { ResolvedItem } from './resolver';
+import { extractYouTubeId } from '../utils/ytdlp';
 
 const parser = new Parser({
   timeout: 10_000,
@@ -116,8 +117,92 @@ async function resolveSpotifyPodcast(url: string): Promise<ResolvedItem | null> 
 }
 
 // ---------------------------------------------------------------------------
+// YouTube → Podcast Index episode lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Given a YouTube video URL, check if the video is also available as a podcast
+ * episode on an RSS feed indexed by Podcast Index.
+ *
+ * Flow:
+ *   1. YouTube oEmbed API → video title + channel name (free, no auth)
+ *   2. Search Podcast Index by channel name → up to 3 candidate feeds
+ *   3. For each feed, scan recent episodes for a title that matches the video
+ *   4. Return the matching episode's audio URL, or null if no match
+ */
+export async function resolveYouTubeViaPodcastIndex(url: string): Promise<ResolvedItem | null> {
+  const videoId = extractYouTubeId(url);
+  if (!videoId) return null;
+
+  // Step 1: YouTube oEmbed — title and channel name, no auth required
+  let videoTitle: string;
+  let channelName: string;
+  try {
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const resp = await fetchWithTimeout(oEmbedUrl, {}, 5_000);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { title: string; author_name: string };
+    videoTitle = data.title;
+    channelName = data.author_name;
+  } catch {
+    return null;
+  }
+
+  console.log(`YouTube→Podcast: video="${videoTitle}" channel="${channelName}"`);
+
+  // Step 2: Search Podcast Index by channel name
+  const feedUrls = await searchPodcastIndexFeeds(channelName, 3);
+  if (feedUrls.length === 0) {
+    console.log(`YouTube→Podcast: no Podcast Index feeds found for "${channelName}"`);
+    return null;
+  }
+
+  // Step 3: Scan each feed's recent episodes for a matching title
+  for (const feedUrl of feedUrls) {
+    const episode = await findEpisodeInFeed(feedUrl, videoTitle);
+    if (episode) {
+      console.log(`YouTube→Podcast: matched episode "${episode.title}" in ${feedUrl}`);
+      return { ...episode, originalURL: url };
+    }
+  }
+
+  console.log(`YouTube→Podcast: no episode match found across ${feedUrls.length} feed(s)`);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Podcast Index search
 // ---------------------------------------------------------------------------
+
+/** Returns up to `max` feed URLs matching the search query. */
+async function searchPodcastIndexFeeds(query: string, max = 3): Promise<string[]> {
+  const apiKey = process.env.PODCAST_INDEX_API_KEY?.trim();
+  const apiSecret = process.env.PODCAST_INDEX_API_SECRET?.trim();
+  if (!apiKey || !apiSecret) return [];
+
+  const unixTime = Math.floor(Date.now() / 1000);
+  const hash = crypto.createHash('sha1').update(apiKey + apiSecret + unixTime).digest('hex');
+
+  const params = new URLSearchParams({ q: query, max: String(max) });
+  try {
+    const resp = await fetchWithTimeout(
+      `https://api.podcastindex.org/api/1.0/search/byterm?${params}`,
+      {
+        headers: {
+          'X-Auth-Key': apiKey,
+          'X-Auth-Date': String(unixTime),
+          Authorization: hash,
+          'User-Agent': 'AudioQueue/1.0',
+        },
+      },
+      8_000,
+    );
+    const data = (await resp.json()) as { feeds?: Array<{ url?: string }> };
+    return (data.feeds ?? []).map((f) => f.url).filter((u): u is string => !!u);
+  } catch {
+    return [];
+  }
+}
 
 async function searchPodcastIndex(query: string): Promise<string | null> {
   const apiKey = process.env.PODCAST_INDEX_API_KEY?.trim();
@@ -162,14 +247,29 @@ async function searchPodcastIndex(query: string): Promise<string | null> {
 // Find a specific episode in a feed by title
 // ---------------------------------------------------------------------------
 
+function wordOverlapScore(a: string, b: string): number {
+  const words = (s: string) => new Set(s.split(/\s+/).filter((w) => w.length > 3));
+  const aWords = words(a);
+  const bWords = words(b);
+  let overlap = 0;
+  for (const w of aWords) if (bWords.has(w)) overlap++;
+  const maxSize = Math.max(aWords.size, bWords.size);
+  return maxSize === 0 ? 0 : overlap / maxSize;
+}
+
 async function findEpisodeInFeed(feedUrl: string, episodeTitle: string): Promise<ResolvedItem | null> {
   try {
     const feed = await parser.parseURL(feedUrl);
     const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').trim();
     const target = normalize(episodeTitle);
 
-    const item = feed.items?.find(i => i.title && normalize(i.title) === target)
-      ?? feed.items?.find(i => i.title && normalize(i.title).includes(target.slice(0, 40)));
+    const item =
+      // 1. Exact match
+      feed.items?.find((i) => i.title && normalize(i.title) === target) ??
+      // 2. One contains the other (handles slightly different formatting)
+      feed.items?.find((i) => i.title && normalize(i.title).includes(target.slice(0, 40))) ??
+      // 3. Word overlap ≥ 60% (handles reordering, minor title differences)
+      feed.items?.find((i) => i.title && wordOverlapScore(normalize(i.title), target) >= 0.6);
 
     if (!item?.enclosure?.url) return null;
 

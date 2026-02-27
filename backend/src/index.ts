@@ -1,7 +1,7 @@
 import express from 'express';
 import resolveRouter from './routes/resolve';
 import authRouter from './routes/auth';
-import queueRouter, { handleQueueStream } from './routes/queue';
+import queueRouter from './routes/queue';
 import { requireAuth } from './middleware/auth';
 import { prisma } from './lib/prisma';
 
@@ -32,7 +32,6 @@ app.get('/health', (_req, res) => {
 // Public
 app.use('/api/resolve', resolveRouter);
 app.use('/api/auth', authRouter);
-app.get('/api/queue/:id/stream', handleQueueStream);  // public — item IDs are unguessable cuids
 
 // Protected
 app.use('/api/queue', requireAuth, queueRouter);
