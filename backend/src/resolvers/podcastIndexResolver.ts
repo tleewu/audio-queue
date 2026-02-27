@@ -97,10 +97,14 @@ async function resolveSpotifyPodcast(url: string): Promise<ResolvedItem | null> 
 // ---------------------------------------------------------------------------
 
 async function searchPodcastIndex(query: string): Promise<string | null> {
-  const apiKey = process.env.PODCAST_INDEX_API_KEY;
-  const apiSecret = process.env.PODCAST_INDEX_API_SECRET;
+  const apiKey = process.env.PODCAST_INDEX_API_KEY?.trim();
+  const apiSecret = process.env.PODCAST_INDEX_API_SECRET?.trim();
   if (!apiKey || !apiSecret) {
-    console.warn('PODCAST_INDEX_API_KEY / PODCAST_INDEX_API_SECRET not set');
+    const missing = [
+      !apiKey && 'PODCAST_INDEX_API_KEY',
+      !apiSecret && 'PODCAST_INDEX_API_SECRET',
+    ].filter(Boolean);
+    console.warn('Podcast Index API not configured (missing or empty):', missing.join(', '));
     return null;
   }
 
