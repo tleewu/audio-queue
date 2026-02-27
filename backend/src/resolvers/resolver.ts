@@ -1,6 +1,7 @@
 import { execYtDlp } from '../utils/ytdlp';
 import { resolveRSS } from './rssResolver';
 import { resolvePodcastPlatform } from './podcastIndexResolver';
+import { extractYouTubeId, resolveViaPiped } from './pipedResolver';
 
 export type SourceType =
   | 'podcast'
@@ -43,7 +44,18 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     return { sourceType: 'unsupported', title: url, audioURL: undefined, originalURL: url };
   }
 
-  // 1. Try yt-dlp (YouTube, SoundCloud, and 1000+ sites)
+  // 1a. YouTube → Piped API (avoids bot detection and IP-locked CDN URLs)
+  if (extractYouTubeId(url)) {
+    try {
+      return await resolveViaPiped(url);
+    } catch (pipedErr) {
+      console.log(`Piped failed for ${url}:`, (pipedErr as Error).message);
+    }
+    // YouTube but Piped failed → unsupported (yt-dlp won't work on Railway either)
+    return { sourceType: 'unsupported', title: url, audioURL: undefined, originalURL: url };
+  }
+
+  // 1b. Try yt-dlp for non-YouTube sites (SoundCloud, Vimeo, etc.)
   try {
     const info = await execYtDlp(url);
     return {

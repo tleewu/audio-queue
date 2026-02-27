@@ -2,33 +2,40 @@ import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
-import { execYtDlp } from '../utils/ytdlp';
+import { extractYouTubeId, resolveViaPiped } from '../resolvers/pipedResolver';
 
 const BACKEND_URL = (process.env.AUDIO_QUEUE_BACKEND_URL ?? 'https://audio-queue-production.up.railway.app').replace(/\/$/, '');
 
-// ─── CDN URL cache ────────────────────────────────────────────────────────────
-// yt-dlp resolves a fresh YouTube CDN URL (signed with this container's IP)
-// once per item per deployment. ffmpeg then fetches directly from the CDN URL,
-// so there's no IP mismatch and no yt-dlp overhead on repeat plays.
-const cdnUrlCache = new Map<string, { url: string; expiresAt: number }>();
+// ─── Stream URL cache ─────────────────────────────────────────────────────────
+// Piped returns proxied audio URLs that are NOT IP-locked. We still cache them
+// to avoid hitting Piped on every seek/retry.  Piped URLs don't embed an expiry
+// so we TTL them at 4 hours (conservative — Piped sessions typically last longer).
+const streamUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const CACHE_TTL_SECONDS = 4 * 3600;
 
-async function getCdnUrl(itemId: string, originalURL: string): Promise<string> {
-  const cached = cdnUrlCache.get(itemId);
+async function getStreamUrl(itemId: string, originalURL: string): Promise<string> {
+  const cached = streamUrlCache.get(itemId);
   if (cached && Date.now() / 1000 < cached.expiresAt - 300) {
-    console.log(`Stream ${itemId}: using cached CDN URL`);
+    console.log(`Stream ${itemId}: using cached Piped URL`);
     return cached.url;
   }
 
-  console.log(`Stream ${itemId}: resolving fresh CDN URL via yt-dlp`);
-  const info = await execYtDlp(originalURL);
+  if (extractYouTubeId(originalURL)) {
+    console.log(`Stream ${itemId}: resolving via Piped`);
+    const resolved = await resolveViaPiped(originalURL);
+    const expiresAt = Math.floor(Date.now() / 1000) + CACHE_TTL_SECONDS;
+    streamUrlCache.set(itemId, { url: resolved.audioURL!, expiresAt });
+    return resolved.audioURL!;
+  }
 
-  const expireMatch = info.url.match(/[?&]expire=(\d+)/);
-  const expiresAt = expireMatch
-    ? parseInt(expireMatch[1], 10)
-    : Math.floor(Date.now() / 1000) + 5 * 3600;
-
-  cdnUrlCache.set(itemId, { url: info.url, expiresAt });
-  return info.url;
+  // Non-YouTube: the stored audioURL in the DB is already a direct URL (from yt-dlp/RSS).
+  // Fetch it from the DB and return it directly.
+  const item = await prisma.queueItem.findUnique({
+    where: { id: itemId },
+    select: { audioURL: true },
+  });
+  if (!item?.audioURL) throw new Error(`No audioURL stored for item ${itemId}`);
+  return item.audioURL;
 }
 
 const router = Router();
@@ -162,7 +169,7 @@ async function resolveInBackground(itemId: string, url: string): Promise<void> {
 
 // ─── Public stream proxy (registered in index.ts, no auth required) ──────────
 // Item IDs are cuids — unguessable without the authenticated GET /api/queue.
-// Flow: getCdnUrl (yt-dlp, cached) → ffmpeg (re-mux to fMP4) → iOS AVPlayer.
+// Flow: getStreamUrl (Piped for YouTube, cached) → ffmpeg (re-mux to fMP4) → iOS AVPlayer.
 export async function handleQueueStream(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   const item = await prisma.queueItem.findUnique({
@@ -175,22 +182,22 @@ export async function handleQueueStream(req: Request, res: Response): Promise<vo
     return;
   }
 
-  let cdnUrl: string;
+  let streamUrl: string;
   try {
-    cdnUrl = await getCdnUrl(id, item.originalURL);
+    streamUrl = await getStreamUrl(id, item.originalURL);
   } catch (err) {
-    console.error(`Stream ${id}: yt-dlp failed:`, err);
+    console.error(`Stream ${id}: URL resolution failed:`, err);
     res.status(502).json({ error: 'Could not resolve stream URL' });
     return;
   }
 
-  console.log(`Stream ${id}: ffmpeg from CDN URL`);
+  console.log(`Stream ${id}: ffmpeg from Piped/source URL`);
   res.setHeader('Content-Type', 'audio/mp4');
 
   // Re-mux to fragmented MP4: puts empty_moov at the very start so AVPlayer
   // can parse codec info immediately without scanning the entire file.
   const ffmpeg = spawn('ffmpeg', [
-    '-i', cdnUrl,
+    '-i', streamUrl,
     '-vn',
     '-c:a', 'copy',      // no re-encoding — just container swap
     '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
