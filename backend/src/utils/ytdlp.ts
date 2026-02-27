@@ -27,6 +27,7 @@ export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpI
     '--dump-json',
     '--no-playlist',
     '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
+    '--extractor-args', 'youtube:player_client=ios',
     '--no-warnings',
     '--quiet',
     url,
