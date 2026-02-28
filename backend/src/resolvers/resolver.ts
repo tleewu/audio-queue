@@ -106,7 +106,7 @@ async function fetchYouTubeMeta(url: string): Promise<YouTubeMeta | null> {
   }
 }
 
-function classifyExtractor(url: string, extractor: string): SourceType {
+export function classifyExtractor(url: string, extractor: string): SourceType {
   const e = extractor.toLowerCase();
   if (e.includes('soundcloud')) return 'soundcloud';
   if (url.includes('substack.com') || e.includes('substack')) return 'substack';
