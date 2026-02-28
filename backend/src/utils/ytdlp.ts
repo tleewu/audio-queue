@@ -51,14 +51,13 @@ export async function execYtDlp(
   const args = [
     '--dump-json',
     '--no-playlist',
-    '-f', hasCookies ? 'bestaudio/best' : 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
+    '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
+    // android_creator: full audio formats, no nsig JS challenge needed
+    // tv_embedded: limited formats but works without cookies
+    '--extractor-args', `youtube:player_client=${hasCookies ? 'android_creator' : 'tv_embedded'}`,
+    '--no-warnings',
+    '--quiet',
   ];
-
-  // tv_embedded has limited formats; skip it when cookies provide full access
-  if (!hasCookies) {
-    args.push('--extractor-args', 'youtube:player_client=tv_embedded');
-    args.push('--no-warnings', '--quiet');
-  }
 
   let cookieTmpFile: string | undefined;
   if (options?.cookies) {
