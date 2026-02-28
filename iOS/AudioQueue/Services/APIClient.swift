@@ -11,7 +11,7 @@ actor APIClient {
 
     private let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
-            ?? "https://audio-queue-production.up.railway.app"
+            ?? "https://audio-queue-staging.up.railway.app"
     }()
 
     private let decoder: JSONDecoder = {
@@ -45,6 +45,12 @@ actor APIClient {
         var req = try buildRequest(path: "/api/auth/apple", method: "POST", auth: false)
         req.httpBody = try JSONEncoder().encode(["identityToken": identityToken])
         return try await perform(req)
+    }
+
+    func validateToken() async throws {
+        let req = try buildRequest(path: "/api/auth/me", method: "GET")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        try checkStatus(response)
     }
 
     // MARK: - Queue
