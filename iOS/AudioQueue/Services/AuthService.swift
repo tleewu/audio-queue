@@ -10,6 +10,9 @@ final class AuthService: ObservableObject {
     private init() {
         isAuthenticated = KeychainService.loadToken() != nil
         checkCredentialState()
+        if isAuthenticated {
+            validateToken()
+        }
     }
 
     // MARK: - Sign In with Apple
@@ -38,6 +41,18 @@ final class AuthService: ObservableObject {
         provider.getCredentialState(forUserID: userID) { [weak self] state, _ in
             if state == .revoked || state == .notFound {
                 Task { @MainActor in self?.signOut() }
+            }
+        }
+    }
+
+    private func validateToken() {
+        Task {
+            do {
+                try await APIClient.shared.validateToken()
+            } catch APIError.unauthorized {
+                signOut()
+            } catch {
+                // Network error — don't sign out, let normal API calls handle it
             }
         }
     }

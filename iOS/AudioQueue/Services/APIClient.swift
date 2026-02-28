@@ -47,6 +47,12 @@ actor APIClient {
         return try await perform(req)
     }
 
+    func validateToken() async throws {
+        let req = try buildRequest(path: "/api/auth/me", method: "GET")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        try checkStatus(response)
+    }
+
     // MARK: - Queue
 
     func fetchQueue() async throws -> [QueueItem] {
