@@ -8,6 +8,7 @@ enum QueueTab: String, CaseIterable {
 struct QueueListView: View {
     @ObservedObject var queueVM: QueueViewModel
     @ObservedObject var playerVM: PlayerViewModel
+    @ObservedObject private var engine = AudioEngine.shared
 
     @State private var showAddURL = false
     @State private var currentPlayIndex = 0
@@ -37,12 +38,15 @@ struct QueueListView: View {
                     .listRowSeparator(.hidden)
                 } else {
                     ForEach(displayedItems) { item in
-                        Button {
-                            handleTap(item)
-                        } label: {
-                            QueueRowView(item: item, showPlayButton: !isArchive)
-                        }
-                        .buttonStyle(.plain)
+                        QueueRowView(
+                            item: item,
+                            isCurrentItem: engine.currentItem?.id == item.id,
+                            isPlaying: engine.isPlaying,
+                            progress: progressFor(item),
+                            secondsRemaining: secondsRemainingFor(item),
+                            onPlayPause: item.isPlayable ? { handlePlayPause(item) } : nil,
+                            onOpenInApp: item.isOpenInApp ? { handleOpenInApp(item) } : nil
+                        )
                         .simultaneousGesture(
                             LongPressGesture(minimumDuration: 0.5)
                                 .onEnded { _ in
@@ -83,26 +87,9 @@ struct QueueListView: View {
             .listStyle(.plain)
             .environment(\.editMode, isReordering ? .constant(.active) : .constant(.inactive))
         }
-        .overlay(alignment: .bottomTrailing) {
-            if selectedTab == .queue && !queueVM.sortedQueue.isEmpty && playerVM.engine.currentItem == nil {
-                Button {
-                    currentPlayIndex = 0
-                    Task { await playFrom(index: 0) }
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color.accentColor)
-                        .clipShape(Circle())
-                        .shadow(radius: 6, y: 3)
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 20)
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom) {
-            if playerVM.engine.currentItem != nil {
+            if engine.currentItem != nil {
                 PlayerView(playerVM: playerVM, queueVM: queueVM)
                     .transition(.move(edge: .bottom))
             }
@@ -134,12 +121,10 @@ struct QueueListView: View {
                 }
                 .fontWeight(.semibold)
             } else {
-                Picker("", selection: $selectedTab) {
-                    ForEach(QueueTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
+                Spacer()
+                tabToggleButton(tab: .queue, icon: "list.bullet")
+                tabToggleButton(tab: .archive, icon: "checkmark.square")
+                Spacer()
 
                 Button {
                     showAddURL = true
@@ -155,6 +140,39 @@ struct QueueListView: View {
         .onChange(of: selectedTab) { _, _ in
             isReordering = false
         }
+    }
+
+    private func tabToggleButton(tab: QueueTab, icon: String) -> some View {
+        let isSelected = selectedTab == tab
+        return Button {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                selectedTab = tab
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                if isSelected {
+                    Text(tab.rawValue)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.8, anchor: .leading)),
+                            removal: .opacity.combined(with: .scale(scale: 0.8, anchor: .leading))
+                        ))
+                }
+            }
+            .padding(.horizontal, isSelected ? 14 : 10)
+            .padding(.vertical, 8)
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.25))
+                }
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Empty States
@@ -203,16 +221,41 @@ struct QueueListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Tap Handling
+    // MARK: - Progress
 
-    private func handleTap(_ item: QueueItem) {
-        if item.isOpenInApp {
-            if let url = URL(string: item.originalURL) {
-                UIApplication.shared.open(url)
-            }
+    private func elapsedFor(_ item: QueueItem) -> Double? {
+        if engine.currentItem?.id == item.id {
+            return engine.currentTime > 0 ? engine.currentTime : nil
+        }
+        return engine.savedPosition(for: item.id)
+    }
+
+    private func progressFor(_ item: QueueItem) -> Double? {
+        guard let totalSecs = item.durationSeconds, totalSecs > 0,
+              let elapsed = elapsedFor(item) else { return nil }
+        return elapsed / Double(totalSecs)
+    }
+
+    private func secondsRemainingFor(_ item: QueueItem) -> Double? {
+        guard let totalSecs = item.durationSeconds, totalSecs > 0,
+              let elapsed = elapsedFor(item) else { return nil }
+        return max(0, Double(totalSecs) - elapsed)
+    }
+
+    // MARK: - Row Actions
+
+    private func handlePlayPause(_ item: QueueItem) {
+        if engine.currentItem?.id == item.id {
+            engine.togglePlayPause()
         } else if let idx = queueVM.sortedQueue.firstIndex(where: { $0.id == item.id }) {
             currentPlayIndex = idx
             Task { await playFrom(index: idx) }
+        }
+    }
+
+    private func handleOpenInApp(_ item: QueueItem) {
+        if let url = URL(string: item.originalURL) {
+            UIApplication.shared.open(url)
         }
     }
 

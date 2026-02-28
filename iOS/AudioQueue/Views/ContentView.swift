@@ -7,7 +7,9 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             QueueListView(queueVM: queueVM, playerVM: playerVM)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await queueVM.loadQueue()

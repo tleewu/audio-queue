@@ -27,6 +27,7 @@
 		E0E39B178B8ED59F71AE9345 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E55C4BDA1E4AFF48121B4A8 /* ShareViewController.swift */; };
 		F5058931E006EA559D8E1336 /* QueueViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4C793E869BA50CD02768EE /* QueueViewModel.swift */; };
 		F8A900E2F8A6EED51243CF24 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BD9A562CB8D7E4F654A010 /* ContentView.swift */; };
+		LS7A0001B2C3D4E5F601234567 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +80,7 @@
 		E40BA1623AB2352F6083F425 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		E5E445F4D4CA2DD526E49002 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		EF4C793E869BA50CD02768EE /* QueueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueViewModel.swift; sourceTree = "<group>"; };
+		LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +95,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		LS7A0003D4E5F6012345678901 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				LS7A0001B2C3D4E5F601234567 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		05EB6B2CEF51B7265B0782C7 /* Products */ = {
@@ -149,6 +162,7 @@
 				CFEED3B0B5009C22C40E7F9F /* AudioQueue.entitlements */,
 				80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */,
 				3839FA02DF80893D990CAD70 /* Info.plist */,
+				LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */,
 				64A01A3773B2D05A6FDD7143 /* Models */,
 				55C2F51A3DAFFFCA15973034 /* Services */,
 				703B9B1A50DEB5B07811013F /* ViewModels */,
@@ -199,6 +213,7 @@
 			buildPhases = (
 				81661333883ACC1600001952 /* Sources */,
 				6535D9FC2B7B13768D3639EE /* Frameworks */,
+				LS7A0003D4E5F6012345678901 /* Resources */,
 				83D503FF0C7B3B6C2365A820 /* Embed Foundation Extensions */,
 			);
 			buildRules = (

@@ -2,48 +2,58 @@ import SwiftUI
 
 struct QueueRowView: View {
     let item: QueueItem
-    var showPlayButton: Bool = true
+    var isCurrentItem: Bool = false
+    var isPlaying: Bool = false
+    var progress: Double? = nil
+    var secondsRemaining: Double? = nil
+    var onPlayPause: (() -> Void)? = nil
+    var onOpenInApp: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 14) {
             thumbnail
             info
             Spacer()
-            statusBadge
+            if item.isPlayable, let onPlayPause = onPlayPause {
+                Button(action: onPlayPause) {
+                    Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.accentColor)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                statusBadge
+            }
         }
         .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onOpenInApp?()
+        }
     }
 
     // MARK: - Thumbnail
 
     private var thumbnail: some View {
-        ZStack {
-            Group {
-                if let urlStr = item.thumbnailURL, let url = URL(string: urlStr) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        default:
-                            placeholderIcon
-                        }
+        Group {
+            if let urlStr = item.thumbnailURL, let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        placeholderIcon
                     }
-                } else {
-                    placeholderIcon
                 }
-            }
-            .frame(width: 72, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            // Play button overlay
-            if showPlayButton && item.isPlayable {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.white)
-                    .shadow(radius: 4)
+            } else {
+                placeholderIcon
             }
         }
         .frame(width: 72, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var placeholderIcon: some View {
@@ -71,15 +81,53 @@ struct QueueRowView: View {
                     .lineLimit(1)
             }
 
-            if let duration = item.formattedDuration {
-                Text(duration)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
+            durationOrProgress
         }
     }
 
-    // MARK: - Status Badge
+    @ViewBuilder
+    private var durationOrProgress: some View {
+        if let progress, progress > 0, let remaining = secondsRemaining {
+            HStack(spacing: 8) {
+                Text(formatRemaining(remaining))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
+                progressCapsule(fraction: progress)
+                    .frame(width: 50, height: 12)
+            }
+        } else if let duration = item.formattedDuration {
+            Text(duration)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func progressCapsule(fraction: Double) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.3))
+                    .frame(height: 3)
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: geo.size.width * min(fraction, 1.0), height: 3)
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func formatRemaining(_ seconds: Double) -> String {
+        let mins = Int(ceil(seconds / 60))
+        if mins >= 60 {
+            let h = mins / 60
+            let m = mins % 60
+            return m > 0 ? "\(h) hr \(m) min left" : "\(h) hr left"
+        }
+        return "\(mins) min left"
+    }
 
     @ViewBuilder
     private var statusBadge: some View {

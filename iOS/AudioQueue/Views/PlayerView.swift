@@ -6,8 +6,12 @@ struct PlayerView: View {
 
     @State private var isExpanded = false
     @GestureState private var dragOffset: CGFloat = 0
+    @State private var showAddedToQueueFeedback = false
+    @State private var isDownloading = false
+    @State private var downloadMessage: String? = nil
 
     private var engine: AudioEngine { playerVM.engine }
+    private var currentItem: QueueItem? { engine.currentItem }
 
     var body: some View {
         if isExpanded {
@@ -105,10 +109,15 @@ struct PlayerView: View {
             // Progress bar
             progressBar
                 .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+
+            // Skip controls (small)
+            skipControls
                 .padding(.bottom, 20)
 
-            // Transport controls
-            transportControls
+            // Spotify-style action row (+ download share more play)
+            actionRow
+                .padding(.horizontal, 24)
                 .padding(.bottom, 24)
 
             // Speed picker
@@ -199,26 +208,194 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Transport Controls
+    // MARK: - Skip Controls
 
-    private var transportControls: some View {
+    private var skipControls: some View {
         HStack(spacing: 40) {
             Button { engine.skip(by: -15) } label: {
                 Image(systemName: "gobackward.15")
-                    .font(.system(size: 28))
+                    .font(.system(size: 22))
             }
-
-            Button { engine.togglePlayPause() } label: {
-                Image(systemName: engine.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 60))
-            }
-
             Button { engine.skip(by: 30) } label: {
                 Image(systemName: "goforward.30")
-                    .font(.system(size: 28))
+                    .font(.system(size: 22))
             }
         }
         .foregroundStyle(.primary)
+    }
+
+    // MARK: - Spotify-style Action Row
+
+    private var actionRow: some View {
+        HStack(spacing: 0) {
+            Button { addCurrentToQueue() } label: {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 28))
+            }
+            .disabled(currentItem == nil)
+
+            Spacer()
+
+            Button { downloadCurrent() } label: {
+                ZStack {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 28))
+                    if isDownloading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    }
+                }
+                .frame(width: 32, height: 32)
+            }
+            .disabled(currentItem == nil || currentItem?.audioURL == nil || isDownloading)
+
+            Spacer()
+
+            shareButton
+
+            Spacer()
+
+            Menu {
+                Button { addCurrentToQueue() } label: {
+                    Label("Add to queue", systemImage: "plus.circle")
+                }
+                .disabled(currentItem == nil)
+
+                Button { downloadCurrent() } label: {
+                    Label("Download", systemImage: "arrow.down.circle")
+                }
+                .disabled(currentItem == nil || currentItem?.audioURL == nil || isDownloading)
+
+                if let item = currentItem, let url = URL(string: item.originalURL) {
+                    ShareLink(item: url, subject: Text(item.title), message: Text(item.publisher ?? "")) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
+
+                Divider()
+
+                Button(role: .destructive) { removeCurrentFromQueue() } label: {
+                    Label("Remove from queue", systemImage: "trash")
+                }
+                .disabled(currentItem == nil)
+
+                if let item = currentItem {
+                    if item.isListened {
+                        Button { queueVM.markUnlistened(item) } label: {
+                            Label("Mark as unlistened", systemImage: "arrow.uturn.backward")
+                        }
+                    } else {
+                        Button { queueVM.markListened(item) } label: {
+                            Label("Mark as listened", systemImage: "checkmark.circle")
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 24, weight: .semibold))
+            }
+
+            Spacer()
+
+            Button { engine.togglePlayPause() } label: {
+                Image(systemName: engine.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 56))
+            }
+        }
+        .foregroundStyle(.primary)
+        .alert("Download", isPresented: Binding(
+            get: { downloadMessage != nil },
+            set: { if !$0 { downloadMessage = nil } }
+        )) {
+            Button("OK") { downloadMessage = nil }
+        } message: {
+            if let msg = downloadMessage { Text(msg) }
+        }
+        .overlay(alignment: .top) {
+            if showAddedToQueueFeedback {
+                Text("Added to queue")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: showAddedToQueueFeedback)
+        .task(id: showAddedToQueueFeedback) {
+            guard showAddedToQueueFeedback else { return }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            showAddedToQueueFeedback = false
+        }
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if let item = currentItem, let url = URL(string: item.originalURL) {
+            ShareLink(item: url, subject: Text(item.title), message: Text(item.publisher ?? "")) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 26))
+            }
+        } else {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 26))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Action Handlers
+
+    private func addCurrentToQueue() {
+        guard let item = currentItem else { return }
+        Task {
+            await queueVM.addURL(item.originalURL)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            showAddedToQueueFeedback = true
+        }
+    }
+
+    private func downloadCurrent() {
+        guard let item = currentItem, let audioURLString = item.audioURL, let url = URL(string: audioURLString) else { return }
+        isDownloading = true
+        Task {
+            do {
+                let (location, _) = try await URLSession.shared.download(from: url)
+                let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let downloads = docs.appendingPathComponent("Downloads", isDirectory: true)
+                try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+                let safeTitle = item.title
+                    .components(separatedBy: .punctuationCharacters)
+                    .joined()
+                    .components(separatedBy: .whitespaces)
+                    .filter { !$0.isEmpty }
+                    .prefix(4)
+                    .joined(separator: "_")
+                let ext = (url.pathExtension as String).isEmpty ? "mp3" : url.pathExtension
+                let dest = downloads.appendingPathComponent("\(safeTitle).\(ext)")
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    try FileManager.default.removeItem(at: dest)
+                }
+                try FileManager.default.moveItem(at: location, to: dest)
+                await MainActor.run {
+                    isDownloading = false
+                    downloadMessage = "Saved to Downloads folder"
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloading = false
+                    downloadMessage = "Download failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func removeCurrentFromQueue() {
+        guard let item = currentItem else { return }
+        queueVM.delete(item)
+        engine.clearCurrentItem()
     }
 
     // MARK: - Speed Picker

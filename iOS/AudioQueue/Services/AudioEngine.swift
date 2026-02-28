@@ -27,6 +27,9 @@ final class AudioEngine: ObservableObject {
     private var timeObserver: Any?
     private var itemEndObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
+    private var lastPositionSave: Date = .distantPast
+
+    private static let positionKey = "playbackPositions"
 
     let supportedRates: [Float] = [0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -48,12 +51,30 @@ final class AudioEngine: ObservableObject {
             return
         }
 
-        print("AudioEngine: loading \(url.absoluteString)")
+        savePositionNow()
+        let savedPos = savedPosition(for: item.id)
+        print("AudioEngine: loading \(url.absoluteString) savedPos=\(savedPos ?? 0)")
         let playerItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: playerItem)
         player.playImmediately(atRate: playbackRate)
         currentItem = item
         isPlaying = true
+        lastPositionSave = Date()
+        if let secs = item.durationSeconds, secs > 0 {
+            duration = Double(secs)
+        } else {
+            duration = 0
+        }
+
+        // Seek to saved position immediately (AVPlayer queues it internally)
+        if let savedPos, savedPos > 0 {
+            currentTime = savedPos
+            let target = CMTime(seconds: savedPos, preferredTimescale: 600)
+            player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+                guard let self, finished else { return }
+                print("AudioEngine: restored to \(savedPos)s (immediate seek)")
+            }
+        }
 
         // Log status transitions and errors
         Task {
@@ -61,8 +82,11 @@ final class AudioEngine: ObservableObject {
                 if status == .readyToPlay {
                     print("AudioEngine: readyToPlay duration=\(playerItem.duration.seconds)s")
                     let secs = playerItem.duration.seconds
-                    if secs.isFinite && secs > 0 {
-                        await MainActor.run { self.duration = secs }
+                    await MainActor.run {
+                        if secs.isFinite && secs > 0 {
+                            self.duration = secs
+                        }
+                        self.updateNowPlaying()
                     }
                     break
                 } else if status == .failed {
@@ -107,6 +131,7 @@ final class AudioEngine: ObservableObject {
     func pause() {
         player.pause()
         isPlaying = false
+        savePositionNow()
         updateNowPlaying()
     }
 
@@ -134,6 +159,17 @@ final class AudioEngine: ObservableObject {
         if isPlaying {
             player.rate = rate
         }
+        updateNowPlaying()
+    }
+
+    /// Clears the current item and stops playback (e.g. when removing from queue).
+    func clearCurrentItem() {
+        savePositionNow()
+        player.replaceCurrentItem(with: nil)
+        currentItem = nil
+        currentTime = 0
+        duration = 0
+        isPlaying = false
         updateNowPlaying()
     }
 
@@ -200,6 +236,7 @@ final class AudioEngine: ObservableObject {
             if secs.isFinite {
                 self.currentTime = secs
                 self.updateNowPlayingTime()
+                self.savePositionThrottled()
             }
         }
     }
@@ -212,6 +249,9 @@ final class AudioEngine: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            if let id = self?.currentItem?.id {
+                self?.clearPosition(for: id)
+            }
             self?.isPlaying = false
             self?.currentTime = 0
             NotificationCenter.default.post(name: .audioEngineNextTrack, object: nil)
@@ -257,5 +297,32 @@ final class AudioEngine: ObservableObject {
         guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    // MARK: - Position Persistence
+
+    private func savePositionThrottled() {
+        let now = Date()
+        guard now.timeIntervalSince(lastPositionSave) >= 5 else { return }
+        savePositionNow()
+    }
+
+    private func savePositionNow() {
+        guard let id = currentItem?.id, currentTime > 0 else { return }
+        lastPositionSave = Date()
+        var positions = UserDefaults.standard.dictionary(forKey: Self.positionKey) as? [String: Double] ?? [:]
+        positions[id] = currentTime
+        UserDefaults.standard.set(positions, forKey: Self.positionKey)
+    }
+
+    func savedPosition(for itemId: String) -> Double? {
+        let positions = UserDefaults.standard.dictionary(forKey: Self.positionKey) as? [String: Double]
+        return positions?[itemId]
+    }
+
+    private func clearPosition(for itemId: String) {
+        var positions = UserDefaults.standard.dictionary(forKey: Self.positionKey) as? [String: Double] ?? [:]
+        positions.removeValue(forKey: itemId)
+        UserDefaults.standard.set(positions, forKey: Self.positionKey)
     }
 }
