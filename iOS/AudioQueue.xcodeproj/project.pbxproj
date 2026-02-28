@@ -3,34 +3,46 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		064DAAC7715E381DF2BCD672 /* AddURLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 482AA961D68DE6C02E61A031 /* AddURLView.swift */; };
 		0EA292801A252D6B349FE110 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3402887BFDC0729E6BDBBEFE /* PlayerViewModel.swift */; };
 		2137F57076ABB2A3059EA318 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D1707B5478812FEE56738B3 /* AuthenticationServices.framework */; };
+		220FCE9F7685FA6AEE45295D /* QueueViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6953C8283BE5284F614000C /* QueueViewModelTests.swift */; };
 		2266B6EE5E4426D089F73F3E /* QueueListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5625F1416C7336837652F44 /* QueueListView.swift */; };
 		2B7F7338DA434D80CD712995 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E108CFE3A5482C4EB52B8495 /* KeychainService.swift */; };
 		2BDA6A4AEEF9FCD96F0627E2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E445F4D4CA2DD526E49002 /* APIClient.swift */; };
 		360C0C87C679D4BCA0AF65B7 /* QueueAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518B3F99794EBE14F2CF3411 /* QueueAlgorithm.swift */; };
 		39FE9BFF30DE4B82377CA8B1 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2856591144B5337043BD94F8 /* AuthService.swift */; };
 		3AE56F65E12F83F46036CD0A /* QueueRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E3C8E6A2A1C1B0A7C45146 /* QueueRowView.swift */; };
+		3EB44DB157FEA8E4308A6D5F /* FormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66F9551597646846BA40F82 /* FormatterTests.swift */; };
 		3EC2D54B86CB9A0AD02631A5 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E092D304CF082E932690F2E /* MediaPlayer.framework */; };
 		4CD5D72BB5BE5A72985EEFEE /* QueueItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7CDC0DFD8E712D6B5E03BA /* QueueItem.swift */; };
 		598455E15689E1357F40E8DD /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5A580CEABD4DF9448072E57A /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F7688A46BDA9A9CF6E1F1EB /* Formatters.swift */; };
 		5FFBF0006B841F023012F502 /* AudioQueueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */; };
+		84555673C8E7D02AED230C67 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0B20A91606A767B5B6A34C26 /* LaunchScreen.storyboard */; };
 		8C1F755DC832298F1B48E246 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138021A7BD8283DF255D9E24 /* LoginView.swift */; };
+		967A8F5751957141A4DC57EC /* QueueAlgorithmTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08674FB8CB69B5E72F8D5958 /* QueueAlgorithmTests.swift */; };
 		96EAF7BDD24A4E936493609B /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA92B08C53732C0CA102A07 /* PlayerView.swift */; };
+		B7E341A78F2A2520730EB2EA /* QueueItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5A8D139FDD297C3AE3A03E /* QueueItemTests.swift */; };
 		CC2722CA7E99AFDEDDF18244 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E03C7116EAC43148328D311 /* AudioEngine.swift */; };
 		CDC437CB40C2ECB0BDA54A7B /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D1749C4603A054D99917B6BB /* AVFoundation.framework */; };
 		E0E39B178B8ED59F71AE9345 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E55C4BDA1E4AFF48121B4A8 /* ShareViewController.swift */; };
 		F5058931E006EA559D8E1336 /* QueueViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4C793E869BA50CD02768EE /* QueueViewModel.swift */; };
 		F8A900E2F8A6EED51243CF24 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BD9A562CB8D7E4F654A010 /* ContentView.swift */; };
-		LS7A0001B2C3D4E5F601234567 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		F55E8FF303BDD3284B14B3E1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9714AAD8EA4807606CBF30D4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 70CFD44A94AB2A970A2BB871;
+			remoteInfo = AudioQueue;
+		};
 		FDD97DC19E281B315574C5C0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9714AAD8EA4807606CBF30D4 /* Project object */;
@@ -55,10 +67,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		08674FB8CB69B5E72F8D5958 /* QueueAlgorithmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueAlgorithmTests.swift; sourceTree = "<group>"; };
+		0B20A91606A767B5B6A34C26 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		138021A7BD8283DF255D9E24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		1E092D304CF082E932690F2E /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
-		2358CD944FF534AD43A27116 /* AudioQueue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioQueue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2358CD944FF534AD43A27116 /* AudioQueue.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AudioQueue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2856591144B5337043BD94F8 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		289EB7BCA1C64105BEF82B93 /* AudioQueueTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AudioQueueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E55C4BDA1E4AFF48121B4A8 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		3402887BFDC0729E6BDBBEFE /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		3839FA02DF80893D990CAD70 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -70,17 +85,20 @@
 		8069D9C503EE6442F98C7284 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQueueApp.swift; sourceTree = "<group>"; };
 		8E7CDC0DFD8E712D6B5E03BA /* QueueItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItem.swift; sourceTree = "<group>"; };
+		8F7688A46BDA9A9CF6E1F1EB /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
 		9D1707B5478812FEE56738B3 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		AFA92B08C53732C0CA102A07 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CFEED3B0B5009C22C40E7F9F /* AudioQueue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AudioQueue.entitlements; sourceTree = "<group>"; };
 		D1749C4603A054D99917B6BB /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		D5625F1416C7336837652F44 /* QueueListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueListView.swift; sourceTree = "<group>"; };
 		E108CFE3A5482C4EB52B8495 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		E40BA1623AB2352F6083F425 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		E5E445F4D4CA2DD526E49002 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		E66F9551597646846BA40F82 /* FormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatterTests.swift; sourceTree = "<group>"; };
+		E6953C8283BE5284F614000C /* QueueViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueViewModelTests.swift; sourceTree = "<group>"; };
 		EF4C793E869BA50CD02768EE /* QueueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueViewModel.swift; sourceTree = "<group>"; };
-		LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		FB5A8D139FDD297C3AE3A03E /* QueueItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItemTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,22 +114,12 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
-/* Begin PBXResourcesBuildPhase section */
-		LS7A0003D4E5F6012345678901 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				LS7A0001B2C3D4E5F601234567 /* LaunchScreen.storyboard in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXGroup section */
 		05EB6B2CEF51B7265B0782C7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				2358CD944FF534AD43A27116 /* AudioQueue.app */,
+				289EB7BCA1C64105BEF82B93 /* AudioQueueTests.xctest */,
 				BDDC96F9BECDA0259ED91C8B /* ShareExtension.appex */,
 			);
 			name = Products;
@@ -150,6 +158,7 @@
 			isa = PBXGroup;
 			children = (
 				A4EE8BF6ABA1437A43A839A9 /* AudioQueue */,
+				A68EB74EE81AF7D6D46083F3 /* AudioQueueTests */,
 				C0FEB0CC1F1F8F6C6032E813 /* ShareExtension */,
 				F48B5E904E1719A490BED0E5 /* Frameworks */,
 				05EB6B2CEF51B7265B0782C7 /* Products */,
@@ -162,13 +171,25 @@
 				CFEED3B0B5009C22C40E7F9F /* AudioQueue.entitlements */,
 				80C20EBBA6D0C4163E11C481 /* AudioQueueApp.swift */,
 				3839FA02DF80893D990CAD70 /* Info.plist */,
-				LS7A0002C3D4E5F6012345678 /* LaunchScreen.storyboard */,
+				0B20A91606A767B5B6A34C26 /* LaunchScreen.storyboard */,
 				64A01A3773B2D05A6FDD7143 /* Models */,
 				55C2F51A3DAFFFCA15973034 /* Services */,
+				CA74372C342FCFB5A3396965 /* Utils */,
 				703B9B1A50DEB5B07811013F /* ViewModels */,
 				C55C2771D39262AFE09DFE40 /* Views */,
 			);
 			path = AudioQueue;
+			sourceTree = "<group>";
+		};
+		A68EB74EE81AF7D6D46083F3 /* AudioQueueTests */ = {
+			isa = PBXGroup;
+			children = (
+				E66F9551597646846BA40F82 /* FormatterTests.swift */,
+				08674FB8CB69B5E72F8D5958 /* QueueAlgorithmTests.swift */,
+				FB5A8D139FDD297C3AE3A03E /* QueueItemTests.swift */,
+				E6953C8283BE5284F614000C /* QueueViewModelTests.swift */,
+			);
+			path = AudioQueueTests;
 			sourceTree = "<group>";
 		};
 		C0FEB0CC1F1F8F6C6032E813 /* ShareExtension */ = {
@@ -194,6 +215,14 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		CA74372C342FCFB5A3396965 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				8F7688A46BDA9A9CF6E1F1EB /* Formatters.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
 		F48B5E904E1719A490BED0E5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -207,13 +236,31 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		57B41870E46DC75C6D20C4E9 /* AudioQueueTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0039BCD6C641A4664EF736 /* Build configuration list for PBXNativeTarget "AudioQueueTests" */;
+			buildPhases = (
+				B20CA45B5492FCA190F2B18E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BE37C4682FFFCB8F940DC528 /* PBXTargetDependency */,
+			);
+			name = AudioQueueTests;
+			packageProductDependencies = (
+			);
+			productName = AudioQueueTests;
+			productReference = 289EB7BCA1C64105BEF82B93 /* AudioQueueTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		70CFD44A94AB2A970A2BB871 /* AudioQueue */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 52A1903725DE5503ACF208F8 /* Build configuration list for PBXNativeTarget "AudioQueue" */;
 			buildPhases = (
 				81661333883ACC1600001952 /* Sources */,
+				7FD9AF8679D2644F998A91AA /* Resources */,
 				6535D9FC2B7B13768D3639EE /* Frameworks */,
-				LS7A0003D4E5F6012345678901 /* Resources */,
 				83D503FF0C7B3B6C2365A820 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -253,6 +300,17 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					57B41870E46DC75C6D20C4E9 = {
+						DevelopmentTeam = "theowu93@gmail.com";
+					};
+					70CFD44A94AB2A970A2BB871 = {
+						DevelopmentTeam = "theowu93@gmail.com";
+					};
+					CFC020EADEF5EF5B643B6A53 = {
+						DevelopmentTeam = "theowu93@gmail.com";
+					};
+				};
 			};
 			buildConfigurationList = 98A7B62B03E8DC16636B0902 /* Build configuration list for PBXProject "AudioQueue" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -264,14 +322,27 @@
 			);
 			mainGroup = 9830F61BD72BAE6B4250C94C;
 			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				70CFD44A94AB2A970A2BB871 /* AudioQueue */,
+				57B41870E46DC75C6D20C4E9 /* AudioQueueTests */,
 				CFC020EADEF5EF5B643B6A53 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7FD9AF8679D2644F998A91AA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84555673C8E7D02AED230C67 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		54056A79C6F0E12C80174FDA /* Sources */ = {
@@ -292,6 +363,7 @@
 				5FFBF0006B841F023012F502 /* AudioQueueApp.swift in Sources */,
 				39FE9BFF30DE4B82377CA8B1 /* AuthService.swift in Sources */,
 				F8A900E2F8A6EED51243CF24 /* ContentView.swift in Sources */,
+				5A580CEABD4DF9448072E57A /* Formatters.swift in Sources */,
 				2B7F7338DA434D80CD712995 /* KeychainService.swift in Sources */,
 				8C1F755DC832298F1B48E246 /* LoginView.swift in Sources */,
 				96EAF7BDD24A4E936493609B /* PlayerView.swift in Sources */,
@@ -304,6 +376,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B20CA45B5492FCA190F2B18E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3EB44DB157FEA8E4308A6D5F /* FormatterTests.swift in Sources */,
+				967A8F5751957141A4DC57EC /* QueueAlgorithmTests.swift in Sources */,
+				B7E341A78F2A2520730EB2EA /* QueueItemTests.swift in Sources */,
+				220FCE9F7685FA6AEE45295D /* QueueViewModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -311,6 +394,11 @@
 			isa = PBXTargetDependency;
 			target = CFC020EADEF5EF5B643B6A53 /* ShareExtension */;
 			targetProxy = FDD97DC19E281B315574C5C0 /* PBXContainerItemProxy */;
+		};
+		BE37C4682FFFCB8F940DC528 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 70CFD44A94AB2A970A2BB871 /* AudioQueue */;
+			targetProxy = F55E8FF303BDD3284B14B3E1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -379,11 +467,29 @@
 			};
 			name = Debug;
 		};
+		366A33D2B63BEDE5277A7222 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AudioQueue.app/AudioQueue";
+			};
+			name = Debug;
+		};
 		5085F137D6BDFFFF512CD0DF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
-				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -398,13 +504,31 @@
 			};
 			name = Release;
 		};
+		783BC81E9812E8DDFCF98A81 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.theowu.audioqueue.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AudioQueue.app/AudioQueue";
+			};
+			name = Release;
+		};
 		829B4859BD64E52E531F8807 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AudioQueue/AudioQueue.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = AudioQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -424,7 +548,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AudioQueue/AudioQueue.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = AudioQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -499,7 +622,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
-				DEVELOPMENT_TEAM = QDNXLUBN47;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -522,6 +644,15 @@
 			buildConfigurations = (
 				E4C33947FF063CA2ACB76865 /* Debug */,
 				5085F137D6BDFFFF512CD0DF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1A0039BCD6C641A4664EF736 /* Build configuration list for PBXNativeTarget "AudioQueueTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				366A33D2B63BEDE5277A7222 /* Debug */,
+				783BC81E9812E8DDFCF98A81 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

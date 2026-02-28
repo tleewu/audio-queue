@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { resolveRSS } from './rssResolver';
 import { ResolvedItem } from './resolver';
 import { extractYouTubeId } from '../utils/ytdlp';
+import { parseDuration } from '../utils/parseDuration';
 
 const parser = new Parser({
   timeout: 10_000,
@@ -253,7 +254,7 @@ async function searchPodcastIndex(query: string): Promise<string | null> {
 // Find a specific episode in a feed by title
 // ---------------------------------------------------------------------------
 
-function wordOverlapScore(a: string, b: string): number {
+export function wordOverlapScore(a: string, b: string): number {
   const words = (s: string) => new Set(s.split(/\s+/).filter((w) => w.length > 3));
   const aWords = words(a);
   const bWords = words(b);
@@ -301,13 +302,3 @@ async function findEpisodeInFeed(feedUrl: string, episodeTitle: string): Promise
   }
 }
 
-function parseDuration(raw: string | number | undefined): number | undefined {
-  if (raw == null) return undefined;
-  if (typeof raw === 'number') return raw;
-  const parts = String(raw).split(':').map(Number);
-  if (parts.some(isNaN)) return undefined;
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 1) return parts[0];
-  return undefined;
-}

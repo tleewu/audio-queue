@@ -117,17 +117,7 @@ struct QueueRowView: View {
         }
     }
 
-    // MARK: - Helpers
-
-    private func formatRemaining(_ seconds: Double) -> String {
-        let mins = Int(ceil(seconds / 60))
-        if mins >= 60 {
-            let h = mins / 60
-            let m = mins % 60
-            return m > 0 ? "\(h) hr \(m) min left" : "\(h) hr left"
-        }
-        return "\(mins) min left"
-    }
+    // MARK: - Helpers (formatRemaining from Utils/Formatters.swift)
 
     @ViewBuilder
     private var statusBadge: some View {

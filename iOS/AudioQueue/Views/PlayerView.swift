@@ -429,22 +429,5 @@ struct PlayerView: View {
             .clipShape(Capsule())
     }
 
-    // MARK: - Helpers
-
-    private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite && seconds > 0 else { return "0:00" }
-        let s = Int(seconds)
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let sec = s % 60
-        if h > 0 {
-            return String(format: "%d:%02d:%02d", h, m, sec)
-        } else {
-            return String(format: "%d:%02d", m, sec)
-        }
-    }
-
-    private func formatRate(_ rate: Float) -> String {
-        rate == 1.0 ? "1×" : String(format: "%.2g×", rate)
-    }
+    // MARK: - Helpers (use shared formatters from Utils/Formatters.swift)
 }

@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { ResolvedItem } from './resolver';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { parseDuration } from '../utils/parseDuration';
 
 const parser = new Parser({
   timeout: 10_000,
@@ -21,14 +22,22 @@ const parser = new Parser({
  *  - RSS / Atom feeds (podcast episodes — picks most recent item)
  *  - Substack /feed URLs
  */
+const audioExtensions = /\.(mp3|m4a|ogg|opus|aac|flac|wav)(\?.*)?$/i;
+
+export function isDirectAudioURL(url: string): boolean {
+  return audioExtensions.test(url);
+}
+
+export function titleFromAudioURL(url: string): string {
+  return decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? url);
+}
+
 export async function resolveRSS(url: string): Promise<ResolvedItem> {
   // 1. Direct audio file?
-  const audioExtensions = /\.(mp3|m4a|ogg|opus|aac|flac|wav)(\?.*)?$/i;
-  if (audioExtensions.test(url)) {
-    const title = decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? url);
+  if (isDirectAudioURL(url)) {
     return {
       sourceType: 'other',
-      title,
+      title: titleFromAudioURL(url),
       audioURL: url,
       originalURL: url,
     };
@@ -80,19 +89,3 @@ export async function resolveRSS(url: string): Promise<ResolvedItem> {
   };
 }
 
-/**
- * Parse iTunes duration string (HH:MM:SS or MM:SS or raw seconds) → seconds.
- */
-function parseDuration(raw: string | number | undefined): number | undefined {
-  if (raw == null) return undefined;
-  if (typeof raw === 'number') return raw;
-
-  const parts = String(raw).split(':').map(Number);
-  if (parts.some(isNaN)) return undefined;
-
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 1) return parts[0];
-
-  return undefined;
-}
