@@ -47,17 +47,17 @@ export async function execYtDlp(
   options?: { cookies?: string; timeoutMs?: number },
 ): Promise<YtDlpInfo> {
   const timeoutMs = options?.timeoutMs ?? 30_000;
+  const hasCookies = !!options?.cookies;
   const args = [
     '--dump-json',
     '--no-playlist',
-    '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
-    '--no-warnings',
-    '--quiet',
+    '-f', hasCookies ? 'bestaudio/best' : 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
   ];
 
   // tv_embedded has limited formats; skip it when cookies provide full access
-  if (!options?.cookies) {
+  if (!hasCookies) {
     args.push('--extractor-args', 'youtube:player_client=tv_embedded');
+    args.push('--no-warnings', '--quiet');
   }
 
   let cookieTmpFile: string | undefined;
