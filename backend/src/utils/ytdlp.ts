@@ -51,10 +51,14 @@ export async function execYtDlp(
     '--dump-json',
     '--no-playlist',
     '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
-    '--extractor-args', 'youtube:player_client=tv_embedded',
     '--no-warnings',
     '--quiet',
   ];
+
+  // tv_embedded has limited formats; skip it when cookies provide full access
+  if (!options?.cookies) {
+    args.push('--extractor-args', 'youtube:player_client=tv_embedded');
+  }
 
   let cookieTmpFile: string | undefined;
   if (options?.cookies) {

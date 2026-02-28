@@ -286,9 +286,18 @@ struct QueueListView: View {
     }
 
     private func handleOpenInApp(_ item: QueueItem) {
-        // YouTube items without cookies → prompt sign-in instead of opening Safari
-        if item.sourceType == "youtube" && item.audioURL == nil && !ytCookieService.isSignedIn {
-            showYouTubeAuth = true
+        if item.sourceType == "youtube" && item.audioURL == nil {
+            if ytCookieService.isSignedIn {
+                // Re-resolve with cookies, then play if successful
+                Task {
+                    let updated = await queueVM.reResolveIfNeeded(item: item)
+                    if updated.isPlayable {
+                        await playerVM.playItem(updated, queueVM: queueVM)
+                    }
+                }
+            } else {
+                showYouTubeAuth = true
+            }
             return
         }
         if let url = URL(string: item.originalURL) {
