@@ -33,6 +33,7 @@ final class AudioEngine: ObservableObject {
     // MARK: - Init
 
     private init() {
+        player.automaticallyWaitsToMinimizeStalling = false
         setupAudioSession()
         setupRemoteCommands()
         setupTimeObserver()
@@ -47,21 +48,43 @@ final class AudioEngine: ObservableObject {
             return
         }
 
+        print("AudioEngine: loading \(url.absoluteString)")
         let playerItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: playerItem)
-        player.play()
-        player.rate = playbackRate
+        player.playImmediately(atRate: playbackRate)
         currentItem = item
         isPlaying = true
 
-        // Read actual duration once it's known
+        // Log status transitions and errors
         Task {
             for await status in playerItem.publisher(for: \.status).values {
                 if status == .readyToPlay {
+                    print("AudioEngine: readyToPlay duration=\(playerItem.duration.seconds)s")
                     let secs = playerItem.duration.seconds
                     if secs.isFinite && secs > 0 {
                         await MainActor.run { self.duration = secs }
                     }
+                    break
+                } else if status == .failed {
+                    let err = playerItem.error as NSError?
+                    print("AudioEngine: FAILED url=\(url.absoluteString) error=\(err?.localizedDescription ?? "nil") code=\(err?.code ?? -1) domain=\(err?.domain ?? "nil")")
+                    break
+                }
+            }
+        }
+
+        // Log why AVPlayer is waiting (buffering vs error)
+        Task {
+            for await tcs in player.publisher(for: \.timeControlStatus).values {
+                switch tcs {
+                case .playing:
+                    print("AudioEngine: timeControlStatus=playing")
+                    return
+                case .waitingToPlayAtSpecifiedRate:
+                    print("AudioEngine: timeControlStatus=waiting reason=\(player.reasonForWaitingToPlay?.rawValue ?? "nil")")
+                case .paused:
+                    print("AudioEngine: timeControlStatus=paused")
+                @unknown default:
                     break
                 }
             }
@@ -117,12 +140,20 @@ final class AudioEngine: ObservableObject {
     // MARK: - Audio Session
 
     private func setupAudioSession() {
+        let session = AVAudioSession.sharedInstance()
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetooth, .allowAirPlay])
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothA2DP, .allowAirPlay])
             try session.setActive(true)
+            print("AudioEngine: AVAudioSession active (full)")
         } catch {
-            print("AudioEngine: AVAudioSession setup failed: \(error)")
+            print("AudioEngine: full session setup failed (\(error)), retrying minimal")
+            do {
+                try session.setCategory(.playback)
+                try session.setActive(true)
+                print("AudioEngine: AVAudioSession active (minimal)")
+            } catch {
+                print("AudioEngine: AVAudioSession setup completely failed: \(error)")
+            }
         }
     }
 
