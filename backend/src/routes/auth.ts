@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { verifyAppleToken } from '../utils/appleAuth';
 import { prisma } from '../lib/prisma';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -35,6 +36,16 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
     console.error('Apple auth error:', err);
     res.status(401).json({ error: 'Authentication failed' });
   }
+});
+
+// GET /api/auth/me — validate token and return current user
+router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) {
+    res.status(401).json({ error: 'User not found' });
+    return;
+  }
+  res.json({ id: user.id, email: user.email });
 });
 
 export default router;

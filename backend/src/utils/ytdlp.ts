@@ -1,5 +1,9 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { writeFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { randomBytes } from 'crypto';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,27 +42,48 @@ export function extractYouTubeId(url: string): string | null {
  * Uses execFile (not exec) so args are passed directly — no shell
  * interpretation of brackets, quotes, or special characters.
  */
-export async function execYtDlp(url: string, timeoutMs = 30_000): Promise<YtDlpInfo> {
+export async function execYtDlp(
+  url: string,
+  options?: { cookies?: string; timeoutMs?: number },
+): Promise<YtDlpInfo> {
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+  const hasCookies = !!options?.cookies;
   const args = [
     '--dump-json',
     '--no-playlist',
     '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=mp4a]/bestaudio/best',
-    '--extractor-args', 'youtube:player_client=tv_embedded',
+    // android_creator: full audio formats, no nsig JS challenge needed
+    // tv_embedded: limited formats but works without cookies
+    '--extractor-args', `youtube:player_client=${hasCookies ? 'android_creator' : 'tv_embedded'}`,
     '--no-warnings',
     '--quiet',
-    url,
   ];
 
-  const { stdout } = await execFileAsync('yt-dlp', args, {
-    timeout: timeoutMs,
-    maxBuffer: 10 * 1024 * 1024,
-  });
-
-  const info = JSON.parse(stdout.trim()) as YtDlpInfo;
-
-  if (!info.url) {
-    throw new Error('yt-dlp returned no stream URL');
+  let cookieTmpFile: string | undefined;
+  if (options?.cookies) {
+    cookieTmpFile = join(tmpdir(), `ytdlp-cookies-${randomBytes(8).toString('hex')}.txt`);
+    writeFileSync(cookieTmpFile, options.cookies, 'utf-8');
+    args.push('--cookies', cookieTmpFile);
   }
 
-  return info;
+  args.push(url);
+
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', args, {
+      timeout: timeoutMs,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const info = JSON.parse(stdout.trim()) as YtDlpInfo;
+
+    if (!info.url) {
+      throw new Error('yt-dlp returned no stream URL');
+    }
+
+    return info;
+  } finally {
+    if (cookieTmpFile) {
+      try { unlinkSync(cookieTmpFile); } catch {}
+    }
+  }
 }

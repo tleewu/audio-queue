@@ -11,7 +11,7 @@ actor APIClient {
 
     private let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
-            ?? "https://audio-queue-production.up.railway.app"
+            ?? "https://audio-queue-staging.up.railway.app"
     }()
 
     private let decoder: JSONDecoder = {
@@ -47,6 +47,12 @@ actor APIClient {
         return try await perform(req)
     }
 
+    func validateToken() async throws {
+        let req = try buildRequest(path: "/api/auth/me", method: "GET")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        try checkStatus(response)
+    }
+
     // MARK: - Queue
 
     func fetchQueue() async throws -> [QueueItem] {
@@ -54,9 +60,23 @@ actor APIClient {
         return try await perform(req)
     }
 
-    func addToQueue(url: String) async throws -> QueueItem {
+    func addToQueue(url: String, cookies: String? = nil) async throws -> QueueItem {
         var req = try buildRequest(path: "/api/queue", method: "POST")
-        req.httpBody = try JSONEncoder().encode(["url": url])
+        if let cookies {
+            req.httpBody = try JSONEncoder().encode(["url": url, "cookies": cookies])
+        } else {
+            req.httpBody = try JSONEncoder().encode(["url": url])
+        }
+        return try await perform(req)
+    }
+
+    func reResolveItem(id: String, cookies: String? = nil) async throws -> QueueItem {
+        var req = try buildRequest(path: "/api/queue/\(id)/re-resolve", method: "POST")
+        if let cookies {
+            req.httpBody = try JSONEncoder().encode(["cookies": cookies])
+        } else {
+            req.httpBody = try JSONEncoder().encode([String: String]())
+        }
         return try await perform(req)
     }
 

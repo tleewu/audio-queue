@@ -16,10 +16,13 @@ schemes:
       targets:
         AudioQueue: all
         ShareExtension: all
+        AudioQueueTests: [test]
     run:
       config: Debug
     test:
       config: Debug
+      targets:
+        - AudioQueueTests
     profile:
       config: Release
     analyze:
@@ -63,6 +66,7 @@ targets:
       - sdk: AVFoundation.framework
       - sdk: MediaPlayer.framework
       - sdk: AuthenticationServices.framework
+      - sdk: WebKit.framework
       - target: ShareExtension
 
   ShareExtension:
@@ -91,3 +95,16 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.theowu.audioqueue.share
       SWIFT_VERSION: "5.9"
     dependencies: []
+
+  AudioQueueTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: AudioQueueTests
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.theowu.audioqueue.tests
+      SWIFT_VERSION: "5.9"
+      GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: AudioQueue
