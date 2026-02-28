@@ -15,7 +15,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
 // POST /api/queue — insert pending item, fire-and-forget resolve
 router.post('/', async (req: Request, res: Response): Promise<void> => {
-  const { url } = req.body as { url?: string };
+  const { url, cookies } = req.body as { url?: string; cookies?: string };
   if (!url) {
     res.status(400).json({ error: 'url required' });
     return;
@@ -38,7 +38,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     },
   });
 
-  resolveInBackground(item.id, url);
+  resolveInBackground(item.id, url, cookies);
   res.status(201).json(item);
 });
 
@@ -95,10 +95,45 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   res.json(updated);
 });
 
-// Background resolution helper
-async function resolveInBackground(itemId: string, url: string): Promise<void> {
+// POST /api/queue/:id/re-resolve — synchronously re-resolve an item (e.g. expired YouTube CDN URL)
+router.post('/:id/re-resolve', async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { cookies } = req.body as { cookies?: string };
+
+  const item = await prisma.queueItem.findFirst({
+    where: { id, userId: req.userId! },
+  });
+  if (!item) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
   try {
-    const resolved = await dispatch(url);
+    const resolved = await dispatch(item.originalURL, cookies);
+    const isExternal = resolved.sourceType === 'youtube' && !resolved.audioURL;
+    const updated = await prisma.queueItem.update({
+      where: { id },
+      data: {
+        title: resolved.title || item.originalURL,
+        sourceType: resolved.sourceType,
+        audioURL: resolved.audioURL ?? null,
+        durationSeconds: resolved.durationSeconds ?? null,
+        thumbnailURL: resolved.thumbnailURL ?? null,
+        publisher: resolved.publisher ?? null,
+        resolveStatus: resolved.audioURL || isExternal ? 'resolved' : 'failed',
+        resolveError: resolved.audioURL || isExternal ? null : 'No audio stream found',
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Background resolution helper
+async function resolveInBackground(itemId: string, url: string, cookies?: string): Promise<void> {
+  try {
+    const resolved = await dispatch(url, cookies);
     // 'youtube' items intentionally have no audioURL (opens in YouTube app) — mark resolved not failed
     const isExternal = resolved.sourceType === 'youtube' && !resolved.audioURL;
     // updateMany is a no-op when the item was deleted before resolution finished

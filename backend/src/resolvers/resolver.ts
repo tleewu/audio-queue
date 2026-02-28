@@ -20,7 +20,7 @@ export interface ResolvedItem {
   originalURL: string;
 }
 
-export async function dispatch(url: string): Promise<ResolvedItem> {
+export async function dispatch(url: string, cookies?: string): Promise<ResolvedItem> {
   // 0. Spotify / Apple Podcasts → Podcast Index → RSS
   if (
     url.includes('open.spotify.com/show') ||
@@ -46,7 +46,25 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     });
     if (rssResult) return rssResult;
 
-    // No RSS match — resolve metadata only (title, thumbnail) via oEmbed for display
+    // Try yt-dlp with user-provided cookies (if available)
+    if (cookies) {
+      try {
+        const info = await execYtDlp(url, { cookies });
+        return {
+          sourceType: 'youtube',
+          title: info.title,
+          publisher: info.uploader ?? info.channel,
+          audioURL: info.url,
+          durationSeconds: info.duration,
+          thumbnailURL: info.thumbnail,
+          originalURL: url,
+        };
+      } catch (err) {
+        console.log(`yt-dlp (with cookies) failed for ${url}:`, (err as Error).message);
+      }
+    }
+
+    // No RSS match and no cookies / yt-dlp failed — resolve metadata only via oEmbed
     const meta = await fetchYouTubeMeta(url);
     return {
       sourceType: 'youtube',
@@ -106,7 +124,7 @@ async function fetchYouTubeMeta(url: string): Promise<YouTubeMeta | null> {
   }
 }
 
-function classifyExtractor(url: string, extractor: string): SourceType {
+export function classifyExtractor(url: string, extractor: string): SourceType {
   const e = extractor.toLowerCase();
   if (e.includes('soundcloud')) return 'soundcloud';
   if (url.includes('substack.com') || e.includes('substack')) return 'substack';

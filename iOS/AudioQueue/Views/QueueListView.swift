@@ -10,7 +10,9 @@ struct QueueListView: View {
     @ObservedObject var playerVM: PlayerViewModel
     @ObservedObject private var engine = AudioEngine.shared
 
+    @StateObject private var ytCookieService = YouTubeCookieService.shared
     @State private var showAddURL = false
+    @State private var showYouTubeAuth = false
     @State private var currentPlayIndex = 0
     @State private var selectedTab: QueueTab = .queue
     @State private var isReordering = false
@@ -101,6 +103,16 @@ struct QueueListView: View {
                 }
             }
         }
+        .sheet(isPresented: $showYouTubeAuth) {
+            YouTubeAuthView {
+                // onComplete — re-resolve will be triggered by onChange below
+            }
+        }
+        .onChange(of: ytCookieService.isSignedIn) { _, signedIn in
+            if signedIn {
+                Task { await queueVM.reResolveYouTubeItems() }
+            }
+        }
         .onReceive(
             NotificationCenter.default.publisher(for: .playerViewModelAdvance)
         ) { _ in
@@ -125,6 +137,26 @@ struct QueueListView: View {
                 tabToggleButton(tab: .queue, icon: "list.bullet")
                 tabToggleButton(tab: .archive, icon: "checkmark.square")
                 Spacer()
+
+                Menu {
+                    if ytCookieService.isSignedIn {
+                        Label("YouTube: Connected", systemImage: "checkmark.circle.fill")
+                        Button(role: .destructive) {
+                            ytCookieService.signOut()
+                        } label: {
+                            Label("Sign out of YouTube", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    } else {
+                        Button {
+                            showYouTubeAuth = true
+                        } label: {
+                            Label("Sign in to YouTube", systemImage: "play.rectangle")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.headline)
+                }
 
                 Button {
                     showAddURL = true
@@ -254,6 +286,11 @@ struct QueueListView: View {
     }
 
     private func handleOpenInApp(_ item: QueueItem) {
+        // YouTube items without cookies → prompt sign-in instead of opening Safari
+        if item.sourceType == "youtube" && item.audioURL == nil && !ytCookieService.isSignedIn {
+            showYouTubeAuth = true
+            return
+        }
         if let url = URL(string: item.originalURL) {
             UIApplication.shared.open(url)
         }

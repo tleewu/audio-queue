@@ -54,9 +54,23 @@ actor APIClient {
         return try await perform(req)
     }
 
-    func addToQueue(url: String) async throws -> QueueItem {
+    func addToQueue(url: String, cookies: String? = nil) async throws -> QueueItem {
         var req = try buildRequest(path: "/api/queue", method: "POST")
-        req.httpBody = try JSONEncoder().encode(["url": url])
+        if let cookies {
+            req.httpBody = try JSONEncoder().encode(["url": url, "cookies": cookies])
+        } else {
+            req.httpBody = try JSONEncoder().encode(["url": url])
+        }
+        return try await perform(req)
+    }
+
+    func reResolveItem(id: String, cookies: String? = nil) async throws -> QueueItem {
+        var req = try buildRequest(path: "/api/queue/\(id)/re-resolve", method: "POST")
+        if let cookies {
+            req.httpBody = try JSONEncoder().encode(["cookies": cookies])
+        } else {
+            req.httpBody = try JSONEncoder().encode([String: String]())
+        }
         return try await perform(req)
     }
 

@@ -42,8 +42,14 @@ final class QueueViewModel: ObservableObject {
         let cleaned = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty, URL(string: cleaned) != nil else { return }
 
+        let cookies: String? = {
+            let lower = cleaned.lowercased()
+            guard lower.contains("youtube.com") || lower.contains("youtu.be") else { return nil }
+            return YouTubeCookieService.shared.cookies
+        }()
+
         do {
-            let item = try await APIClient.shared.addToQueue(url: cleaned)
+            let item = try await APIClient.shared.addToQueue(url: cleaned, cookies: cookies)
             allItems.append(item)
             startPolling(for: item.id)
         } catch APIError.unauthorized {
@@ -85,8 +91,34 @@ final class QueueViewModel: ObservableObject {
 
     func reResolveIfNeeded(item: QueueItem) async -> QueueItem {
         guard item.sourceType == "youtube" else { return item }
-        await loadQueue()
-        return sortedQueue.first(where: { $0.id == item.id }) ?? item
+        let cookies = YouTubeCookieService.shared.cookies
+        do {
+            let updated = try await APIClient.shared.reResolveItem(id: item.id, cookies: cookies)
+            if let idx = allItems.firstIndex(where: { $0.id == updated.id }) {
+                allItems[idx] = updated
+            }
+            return updated
+        } catch {
+            print("reResolveIfNeeded error:", error)
+            await loadQueue()
+            return allItems.first(where: { $0.id == item.id }) ?? item
+        }
+    }
+
+    /// Re-resolve all YouTube items that currently have no audioURL (after sign-in)
+    func reResolveYouTubeItems() async {
+        let cookies = YouTubeCookieService.shared.cookies
+        let ytItems = allItems.filter { $0.sourceType == "youtube" && $0.audioURL == nil }
+        for item in ytItems {
+            do {
+                let updated = try await APIClient.shared.reResolveItem(id: item.id, cookies: cookies)
+                if let idx = allItems.firstIndex(where: { $0.id == updated.id }) {
+                    allItems[idx] = updated
+                }
+            } catch {
+                print("reResolveYouTubeItems error for \(item.id):", error)
+            }
+        }
     }
 
     // MARK: - Actions
