@@ -60,10 +60,11 @@ export async function resolveRSS(url: string): Promise<ResolvedItem> {
   }
 
   const durationSeconds = parseDuration((item as any).itunesDuration);
+  // Prefer episode artwork over podcast/feed image
   const thumbnailURL =
-    feed.image?.url ??
     (item as any).itunesImage?.['$']?.href ??
-    (item as any).mediaThumbnail?.['$']?.url;
+    (item as any).mediaThumbnail?.['$']?.url ??
+    feed.image?.url;
 
   const isSubstack = url.includes('substack.com');
   const sourceType = isSubstack ? 'substack' : 'podcast';

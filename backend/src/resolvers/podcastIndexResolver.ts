@@ -8,7 +8,13 @@ import { extractYouTubeId } from '../utils/ytdlp';
 
 const parser = new Parser({
   timeout: 10_000,
-  customFields: { item: [['itunes:duration', 'itunesDuration'], ['itunes:image', 'itunesImage']] },
+  customFields: {
+    item: [
+      ['itunes:duration', 'itunesDuration'],
+      ['itunes:image', 'itunesImage'],
+      ['media:thumbnail', 'mediaThumbnail'],
+    ],
+  },
 });
 
 // Simple in-process cache to respect 10k/day rate limit
@@ -275,9 +281,11 @@ async function findEpisodeInFeed(feedUrl: string, episodeTitle: string): Promise
 
     const durationRaw = (item as any).itunesDuration;
     const durationSeconds = parseDuration(durationRaw);
+    // Prefer episode artwork over podcast/feed image
     const thumbnailURL =
-      feed.image?.url ??
-      (item as any).itunesImage?.['$']?.href;
+      (item as any).itunesImage?.['$']?.href ??
+      (item as any).mediaThumbnail?.['$']?.url ??
+      feed.image?.url;
 
     return {
       sourceType: 'podcast',
