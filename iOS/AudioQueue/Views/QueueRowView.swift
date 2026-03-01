@@ -43,6 +43,8 @@ struct QueueRowView: View {
 
     private var actionBar: some View {
         HStack(spacing: 20) {
+            Spacer()
+
             if item.isPlayable, let onPlayPause = onPlayPause {
                 Button(action: onPlayPause) {
                     Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
@@ -59,11 +61,8 @@ struct QueueRowView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Spacer()
         }
         .padding(.top, 8)
-        .padding(.leading, 86)
     }
 
     // MARK: - Thumbnail
