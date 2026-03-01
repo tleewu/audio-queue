@@ -56,12 +56,6 @@ struct QueueListView: View {
                                 }
                         )
                         .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                queueVM.delete(item)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-
                             if isArchive {
                                 Button {
                                     queueVM.markUnlistened(item)
@@ -76,6 +70,12 @@ struct QueueListView: View {
                                     Label("Archive", systemImage: "archivebox")
                                 }
                                 .tint(.green)
+                            }
+
+                            Button(role: .destructive) {
+                                queueVM.delete(item)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
