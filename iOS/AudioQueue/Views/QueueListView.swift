@@ -272,9 +272,24 @@ struct QueueListView: View {
     }
 
     private func advanceQueue() async {
-        let nextIndex = currentPlayIndex + 1
-        guard nextIndex < queueVM.sortedQueue.count else { return }
-        currentPlayIndex = nextIndex
-        await playFrom(index: nextIndex)
+        let queue = queueVM.sortedQueue
+
+        // Archive the item that just finished playing and find next by ID
+        if let finishedItem = engine.currentItem,
+           let finishedIndex = queue.firstIndex(where: { $0.id == finishedItem.id }) {
+            queueVM.markListened(finishedItem)
+
+            let nextIndex = finishedIndex + 1
+            guard nextIndex < queue.count else { return }
+            currentPlayIndex = nextIndex
+            let nextItem = queue[nextIndex]
+            await playerVM.playItem(nextItem, queueVM: queueVM)
+        } else {
+            // Fallback if current item not in queue
+            let nextIndex = currentPlayIndex + 1
+            guard nextIndex < queue.count else { return }
+            currentPlayIndex = nextIndex
+            await playFrom(index: nextIndex)
+        }
     }
 }
