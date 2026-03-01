@@ -1,5 +1,5 @@
 import { execYtDlp, extractYouTubeId } from '../utils/ytdlp';
-import { resolveRSS } from './rssResolver';
+import { resolveRSS, isDirectAudioURL } from './rssResolver';
 import { resolvePodcastPlatform, resolveYouTubeViaPodcastIndex } from './podcastIndexResolver';
 
 export type SourceType =
@@ -58,15 +58,20 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     };
   }
 
-  // 2. RSS / podcast / direct audio — try before yt-dlp so podcast feeds
-  //    resolve with proper episode title & podcast author from the feed.
-  try {
-    return await resolveRSS(url);
-  } catch (err) {
-    console.log(`RSS failed for ${url}:`, (err as Error).message);
+  // 2–3. For feed-like URLs (RSS/Atom, direct audio, Substack), try RSS
+  //       first so podcast feeds resolve with proper episode title & author.
+  //       For everything else, try yt-dlp first and fall back to RSS.
+  const rssFirst = isDirectAudioURL(url) || looksLikeFeed(url);
+
+  if (rssFirst) {
+    try {
+      return await resolveRSS(url);
+    } catch (err) {
+      console.log(`RSS failed for ${url}:`, (err as Error).message);
+    }
   }
 
-  // 3. yt-dlp for non-YouTube sites (SoundCloud, Vimeo, etc.)
+  // yt-dlp for non-YouTube sites (SoundCloud, Vimeo, etc.)
   try {
     const info = await execYtDlp(url);
     return {
@@ -80,6 +85,15 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     };
   } catch (err) {
     console.log(`yt-dlp failed for ${url}:`, (err as Error).message);
+  }
+
+  // RSS fallback for non-feed URLs where yt-dlp also failed
+  if (!rssFirst) {
+    try {
+      return await resolveRSS(url);
+    } catch (err) {
+      console.log(`RSS failed for ${url}:`, (err as Error).message);
+    }
   }
 
   // 4. Unsupported
@@ -105,6 +119,13 @@ async function fetchYouTubeMeta(url: string): Promise<YouTubeMeta | null> {
   } catch {
     return null;
   }
+}
+
+/** Quick heuristic: does this URL look like a podcast feed or Substack? */
+export function looksLikeFeed(url: string): boolean {
+  if (url.includes('substack.com')) return true;
+  // Common feed URL patterns: /feed, /rss, /atom paths or .xml/.rss/.atom extensions
+  return /\/(feed|rss|atom)(\/|$|\?)|\.xml(\?|$)|\.rss(\?|$)|\.atom(\?|$)/i.test(url);
 }
 
 export function classifyExtractor(url: string, extractor: string): SourceType {

@@ -13,20 +13,25 @@ vi.mock('../utils/ytdlp', () => ({
 
 vi.mock('../resolvers/rssResolver', () => ({
   resolveRSS: vi.fn(),
+  isDirectAudioURL: vi.fn().mockReturnValue(false),
 }));
 
-import { dispatch } from '../resolvers/resolver';
+import { dispatch, looksLikeFeed } from '../resolvers/resolver';
 import { resolvePodcastPlatform, resolveYouTubeViaPodcastIndex } from '../resolvers/podcastIndexResolver';
 import { extractYouTubeId, execYtDlp } from '../utils/ytdlp';
-import { resolveRSS } from '../resolvers/rssResolver';
+import { resolveRSS, isDirectAudioURL } from '../resolvers/rssResolver';
 
 describe('dispatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: nothing is a YouTube URL
     vi.mocked(extractYouTubeId).mockReturnValue(null);
+    // Default: not a direct audio URL
+    vi.mocked(isDirectAudioURL).mockReturnValue(false);
     // Default: RSS fails (not a feed)
     vi.mocked(resolveRSS).mockRejectedValue(new Error('Not RSS'));
+    // Default: yt-dlp fails
+    vi.mocked(execYtDlp).mockRejectedValue(new Error('Unsupported'));
     // Mock global fetch for YouTube oEmbed (fetchYouTubeMeta)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
   });
@@ -103,7 +108,7 @@ describe('dispatch', () => {
     expect(result.audioURL).toBe('https://cdn.example.com/ep.mp3');
   });
 
-  it('prefers RSS podcast metadata over yt-dlp meta tags', async () => {
+  it('prefers RSS podcast metadata for feed-like URLs over yt-dlp', async () => {
     vi.mocked(resolveRSS).mockResolvedValue({
       sourceType: 'podcast',
       title: 'Podcast Episode Title',
@@ -130,7 +135,23 @@ describe('dispatch', () => {
     expect(result.publisher).toBe('Podcast Author');
   });
 
-  it('tries yt-dlp when RSS fails for non-YouTube URLs', async () => {
+  it('prefers RSS for direct audio URLs', async () => {
+    vi.mocked(isDirectAudioURL).mockReturnValue(true);
+    vi.mocked(resolveRSS).mockResolvedValue({
+      sourceType: 'other',
+      title: 'episode.mp3',
+      audioURL: 'https://example.com/episode.mp3',
+      originalURL: 'https://example.com/episode.mp3',
+    });
+
+    const result = await dispatch('https://example.com/episode.mp3');
+
+    expect(resolveRSS).toHaveBeenCalled();
+    expect(execYtDlp).not.toHaveBeenCalled();
+    expect(result.title).toBe('episode.mp3');
+  });
+
+  it('skips RSS for non-feed URLs and uses yt-dlp directly', async () => {
     vi.mocked(execYtDlp).mockResolvedValue({
       title: 'SoundCloud Track',
       uploader: 'Artist',
@@ -143,18 +164,78 @@ describe('dispatch', () => {
 
     const result = await dispatch('https://soundcloud.com/artist/track');
 
-    expect(resolveRSS).toHaveBeenCalledWith('https://soundcloud.com/artist/track');
+    // RSS should NOT be attempted before yt-dlp for non-feed URLs
+    expect(resolveRSS).not.toHaveBeenCalled();
     expect(execYtDlp).toHaveBeenCalledWith('https://soundcloud.com/artist/track');
     expect(result.sourceType).toBe('soundcloud');
     expect(result.audioURL).toBe('https://cdn.soundcloud.com/stream.mp3');
   });
 
-  it('returns unsupported when all resolvers fail', async () => {
-    vi.mocked(execYtDlp).mockRejectedValue(new Error('Unsupported'));
+  it('falls back to RSS when yt-dlp fails for non-feed URLs', async () => {
+    vi.mocked(resolveRSS).mockResolvedValue({
+      sourceType: 'podcast',
+      title: 'RSS Episode',
+      audioURL: 'https://feeds.example.com/ep.mp3',
+      originalURL: 'https://example.com/page',
+    });
 
+    const result = await dispatch('https://example.com/page');
+
+    // yt-dlp tried first (fails by default), then RSS as fallback
+    expect(execYtDlp).toHaveBeenCalled();
+    expect(resolveRSS).toHaveBeenCalled();
+    expect(result.sourceType).toBe('podcast');
+  });
+
+  it('does not try RSS for x.com/twitter URLs before yt-dlp', async () => {
+    vi.mocked(execYtDlp).mockResolvedValue({
+      title: 'Tweet with video',
+      uploader: 'User',
+      url: 'https://video.twimg.com/stream.mp4',
+      duration: 30,
+      thumbnail: 'https://pbs.twimg.com/thumb.jpg',
+      extractor: 'twitter',
+      webpage_url: 'https://x.com/user/status/123',
+    });
+
+    const result = await dispatch('https://x.com/user/status/123');
+
+    expect(resolveRSS).not.toHaveBeenCalled();
+    expect(result.title).toBe('Tweet with video');
+  });
+
+  it('returns unsupported when all resolvers fail', async () => {
     const result = await dispatch('https://example.com/page');
 
     expect(result.sourceType).toBe('unsupported');
     expect(result.audioURL).toBeUndefined();
+  });
+});
+
+describe('looksLikeFeed', () => {
+  it('matches /feed paths', () => {
+    expect(looksLikeFeed('https://example.com/feed')).toBe(true);
+    expect(looksLikeFeed('https://example.com/feed/')).toBe(true);
+    expect(looksLikeFeed('https://example.com/feed?format=xml')).toBe(true);
+  });
+
+  it('matches /rss paths', () => {
+    expect(looksLikeFeed('https://example.com/rss')).toBe(true);
+    expect(looksLikeFeed('https://anchor.fm/s/123/podcast/rss')).toBe(true);
+  });
+
+  it('matches .xml extensions', () => {
+    expect(looksLikeFeed('https://example.com/podcast.xml')).toBe(true);
+    expect(looksLikeFeed('https://example.com/podcast.xml?v=2')).toBe(true);
+  });
+
+  it('matches substack.com URLs', () => {
+    expect(looksLikeFeed('https://newsletter.substack.com/p/episode-1')).toBe(true);
+  });
+
+  it('does not match regular web pages', () => {
+    expect(looksLikeFeed('https://x.com/user/status/123')).toBe(false);
+    expect(looksLikeFeed('https://soundcloud.com/artist/track')).toBe(false);
+    expect(looksLikeFeed('https://example.com/page')).toBe(false);
   });
 });
