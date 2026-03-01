@@ -58,7 +58,15 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     };
   }
 
-  // 2. yt-dlp for non-YouTube sites (SoundCloud, Vimeo, etc.)
+  // 2. RSS / podcast / direct audio — try before yt-dlp so podcast feeds
+  //    resolve with proper episode title & podcast author from the feed.
+  try {
+    return await resolveRSS(url);
+  } catch (err) {
+    console.log(`RSS failed for ${url}:`, (err as Error).message);
+  }
+
+  // 3. yt-dlp for non-YouTube sites (SoundCloud, Vimeo, etc.)
   try {
     const info = await execYtDlp(url);
     return {
@@ -72,13 +80,6 @@ export async function dispatch(url: string): Promise<ResolvedItem> {
     };
   } catch (err) {
     console.log(`yt-dlp failed for ${url}:`, (err as Error).message);
-  }
-
-  // 3. RSS / podcast / direct audio
-  try {
-    return await resolveRSS(url);
-  } catch (err) {
-    console.log(`RSS failed for ${url}:`, (err as Error).message);
   }
 
   // 4. Unsupported
