@@ -10,29 +10,60 @@ struct QueueRowView: View {
     var onOpenInApp: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 14) {
-            thumbnail
-            info
-            Spacer()
-            if item.isPlayable, let onPlayPause = onPlayPause {
-                Button(action: onPlayPause) {
-                    Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.accentColor)
-                        .clipShape(Circle())
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                thumbnail
+                info
+                Spacer()
+                if item.isPlayable, let onPlayPause = onPlayPause {
+                    Button(action: onPlayPause) {
+                        Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Color.accentColor)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    statusBadge
                 }
-                .buttonStyle(.plain)
-            } else {
-                statusBadge
             }
+
+            actionBar
         }
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture {
             onOpenInApp?()
         }
+    }
+
+    // MARK: - Action Bar
+
+    private var actionBar: some View {
+        HStack(spacing: 20) {
+            if item.isPlayable, let onPlayPause = onPlayPause {
+                Button(action: onPlayPause) {
+                    Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let url = URL(string: item.originalURL) {
+                ShareLink(item: url, subject: Text(item.title), message: Text(item.publisher ?? "")) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.top, 8)
+        .padding(.leading, 86)
     }
 
     // MARK: - Thumbnail
