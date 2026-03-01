@@ -210,10 +210,11 @@ final class AudioEngine: ObservableObject {
             self?.togglePlayPause()
             return .success
         }
-        center.nextTrackCommand.addTarget { [weak self] _ in
-            NotificationCenter.default.post(name: .audioEngineNextTrack, object: nil)
-            return .success
-        }
+        // Disable next/previous track commands so that iOS Control Center
+        // shows the skip forward/backward buttons instead of next/previous track.
+        center.nextTrackCommand.isEnabled = false
+        center.previousTrackCommand.isEnabled = false
+
         center.skipBackwardCommand.preferredIntervals = [15]
         center.skipBackwardCommand.addTarget { [weak self] _ in
             self?.skip(by: -15)
