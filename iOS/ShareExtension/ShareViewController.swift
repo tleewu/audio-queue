@@ -36,7 +36,7 @@ class ShareViewController: UIViewController {
 
     private let titleLabel: UILabel = {
         let l = UILabel()
-        l.text = "Added to Queue"
+        l.text = "Added to cue"
         l.font = .systemFont(ofSize: 20, weight: .semibold)
         l.textColor = .white
         l.translatesAutoresizingMaskIntoConstraints = false

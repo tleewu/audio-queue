@@ -14,11 +14,11 @@ struct LoginView: View {
                 .font(.system(size: 72))
                 .foregroundStyle(.primary)
 
-            Text("Audio Queue")
+            Text("cue")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Sign in to sync your queue across devices.")
+            Text("Save now, listen later.\nSign in to sync your queue across devices.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

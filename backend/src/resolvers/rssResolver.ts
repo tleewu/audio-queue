@@ -37,6 +37,7 @@ export async function resolveRSS(url: string): Promise<ResolvedItem> {
   if (isDirectAudioURL(url)) {
     return {
       sourceType: 'other',
+      playbackType: 'direct',
       title: titleFromAudioURL(url),
       audioURL: url,
       originalURL: url,
@@ -80,6 +81,7 @@ export async function resolveRSS(url: string): Promise<ResolvedItem> {
 
   return {
     sourceType,
+    playbackType: 'direct',
     title: item.title ?? feed.title ?? url,
     publisher: feed.title ?? feed.author,
     audioURL: enclosureUrl,

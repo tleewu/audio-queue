@@ -14,6 +14,10 @@ struct QueueItem: Identifiable, Codable, Equatable {
     var publisher: String?
     var resolveStatus: String
     var resolveError: String?
+    /// "direct" (play audioURL as-is), "proxy" (stream via backend), or
+    /// "external" (open originalURL in the source app). Optional for
+    /// backwards compatibility with pre-playbackType server responses.
+    var playbackType: String?
 }
 
 // MARK: - Convenience
@@ -22,10 +26,19 @@ extension QueueItem {
     var isResolved: Bool { resolveStatus == "resolved" }
     var isFailed:   Bool { resolveStatus == "failed" }
     var isPending:  Bool { resolveStatus == "pending" }
-    var isPlayable: Bool { isResolved && audioURL != nil }
     var isUnsupported: Bool { sourceType == "unsupported" }
-    /// YouTube items with no RSS audio match: resolved but opens in YouTube app instead of playing in-app
-    var isOpenInApp: Bool { isUnsupported || (sourceType == "youtube" && audioURL == nil) }
+
+    /// playbackType with legacy fallback for rows resolved before the field existed
+    var effectivePlaybackType: String {
+        if let playbackType { return playbackType }
+        return audioURL == nil ? "external" : "direct"
+    }
+
+    /// Streams through the backend relay (expiring/IP-locked sources like YouTube/X)
+    var isProxied: Bool { effectivePlaybackType == "proxy" }
+    var isPlayable: Bool { isResolved && audioURL != nil && effectivePlaybackType != "external" }
+    /// Resolved but has no in-app audio: opens originalURL in the source app instead
+    var isOpenInApp: Bool { isUnsupported || (isResolved && effectivePlaybackType == "external") }
 
     var formattedDuration: String? {
         guard let secs = durationSeconds, secs > 0 else { return nil }
@@ -42,6 +55,7 @@ extension QueueItem {
     var sourceEmoji: String {
         switch sourceType {
         case "youtube":    return "▶️"
+        case "x":          return "🐦"
         case "soundcloud": return "☁️"
         case "podcast":    return "🎙"
         case "substack":   return "📧"

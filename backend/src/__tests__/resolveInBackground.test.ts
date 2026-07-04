@@ -24,6 +24,7 @@ describe('resolveInBackground', () => {
   it('updates item with resolved metadata on success', async () => {
     vi.mocked(dispatch).mockResolvedValue({
       sourceType: 'podcast',
+      playbackType: 'direct',
       title: 'Great Episode',
       publisher: 'Show Name',
       audioURL: 'https://cdn.example.com/ep.mp3',
@@ -41,6 +42,7 @@ describe('resolveInBackground', () => {
       data: {
         title: 'Great Episode',
         sourceType: 'podcast',
+        playbackType: 'direct',
         audioURL: 'https://cdn.example.com/ep.mp3',
         durationSeconds: 3600,
         thumbnailURL: 'https://cdn.example.com/thumb.jpg',
@@ -54,6 +56,7 @@ describe('resolveInBackground', () => {
   it('marks YouTube external (no audioURL) as resolved', async () => {
     vi.mocked(dispatch).mockResolvedValue({
       sourceType: 'youtube',
+      playbackType: 'external',
       title: 'YouTube Video',
       publisher: 'Channel',
       audioURL: undefined,
@@ -89,6 +92,7 @@ describe('resolveInBackground', () => {
   it('no-ops when item was deleted mid-resolve', async () => {
     vi.mocked(dispatch).mockResolvedValue({
       sourceType: 'podcast',
+      playbackType: 'direct',
       title: 'Episode',
       audioURL: 'https://cdn.example.com/ep.mp3',
       originalURL: 'https://example.com/feed',
@@ -104,6 +108,7 @@ describe('resolveInBackground', () => {
   it('marks as failed with "No audio stream found" for unsupported result', async () => {
     vi.mocked(dispatch).mockResolvedValue({
       sourceType: 'unsupported',
+      playbackType: 'external',
       title: 'https://example.com/page',
       audioURL: undefined,
       originalURL: 'https://example.com/page',

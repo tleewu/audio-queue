@@ -1,8 +1,12 @@
 import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import resolveRouter from './routes/resolve';
 import authRouter from './routes/auth';
 import queueRouter from './routes/queue';
-import { requireAuth } from './middleware/auth';
+import streamRouter from './routes/stream';
+import legalRouter from './routes/legal';
+import { requireAuth, requireAuthAllowQueryToken } from './middleware/auth';
 import { prisma } from './lib/prisma';
 
 // Surface silent crashes in Railway logs
@@ -23,22 +27,47 @@ const PORT = (() => {
   return Number.isFinite(n) && n > 0 ? n : 8080;
 })();
 
-app.use(express.json());
+// Behind Railway's proxy — needed so rate limiting sees real client IPs
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: '64kb' }));
+
+// General API limiter, plus a tighter one for auth (token issuance)
+const apiLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-// Public
-app.use('/api/resolve', resolveRouter);
-app.use('/api/auth', authRouter);
+// Public HTML pages (privacy policy / support / terms for App Store listing)
+app.use('/', legalRouter);
 
-// Protected
-app.use('/api/queue', requireAuth, queueRouter);
+// Auth
+app.use('/api/auth', authLimiter, authRouter);
+
+// Protected API
+app.use('/api/resolve', apiLimiter, requireAuth, resolveRouter);
+app.use('/api/queue', apiLimiter, requireAuth, queueRouter);
+// Media streaming — AVPlayer authenticates via ?token=; no rate limiter here
+// because a single listen legitimately issues many Range requests.
+app.use('/api/stream', requireAuthAllowQueryToken, streamRouter);
 
 const host = '0.0.0.0';
 app.listen(PORT, host, () => {
-  console.log(`Audio Queue backend listening on http://${host}:${PORT}`);
+  console.log(`cue backend listening on http://${host}:${PORT}`);
 
   // Run startup cleanup outside the listen callback to avoid
   // unhandled-rejection crashes (Express doesn't await async callbacks)

@@ -6,13 +6,27 @@ enum APIError: Error {
     case noData
 }
 
-actor APIClient {
-    static let shared = APIClient()
-
-    private let baseURL: String = {
+/// Backend location, shared by APIClient (JSON API) and AudioEngine (stream proxy URLs).
+enum BackendConfig {
+    static let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
             ?? "https://audio-queue-production.up.railway.app"
     }()
+
+    /// Streaming URL for a proxy-playback item. AVPlayer performs its own
+    /// (Range) requests, so authentication travels as a query token.
+    static func streamURL(forItemId id: String) -> URL? {
+        guard let token = KeychainService.loadToken(),
+              var components = URLComponents(string: "\(baseURL)/api/stream/\(id)") else { return nil }
+        components.queryItems = [URLQueryItem(name: "token", value: token)]
+        return components.url
+    }
+}
+
+actor APIClient {
+    static let shared = APIClient()
+
+    private let baseURL = BackendConfig.baseURL
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
@@ -53,6 +67,13 @@ actor APIClient {
         try checkStatus(response)
     }
 
+    /// Permanently deletes the account and all server-side data.
+    func deleteAccount() async throws {
+        let req = try buildRequest(path: "/api/auth/account", method: "DELETE")
+        let (_, response) = try await URLSession.shared.data(for: req)
+        try checkStatus(response)
+    }
+
     // MARK: - Queue
 
     func fetchQueue() async throws -> [QueueItem] {
@@ -84,9 +105,14 @@ actor APIClient {
         return try await perform(req)
     }
 
+    private struct ReorderEntry: Encodable {
+        let id: String
+        let position: Int
+    }
+
     func reorderQueue(order: [(id: String, position: Int)]) async throws {
         var req = try buildRequest(path: "/api/queue/reorder", method: "PATCH")
-        let body = order.map { ["id": $0.id, "position": String($0.position)] }
+        let body = order.map { ReorderEntry(id: $0.id, position: $0.position) }
         req.httpBody = try JSONEncoder().encode(["order": body])
         let (_, response) = try await URLSession.shared.data(for: req)
         try checkStatus(response)

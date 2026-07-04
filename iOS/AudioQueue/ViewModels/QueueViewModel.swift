@@ -81,12 +81,14 @@ final class QueueViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Re-resolve YouTube at play time
+    // MARK: - Refresh stragglers at play time
 
+    /// Proxy items are refreshed server-side by the stream relay, so only items
+    /// that never resolved need a metadata refresh before playing.
     func reResolveIfNeeded(item: QueueItem) async -> QueueItem {
-        guard item.sourceType == "youtube" else { return item }
+        guard item.isPending || (item.sourceType == "youtube" && !item.isProxied) else { return item }
         await loadQueue()
-        return sortedQueue.first(where: { $0.id == item.id }) ?? item
+        return allItems.first(where: { $0.id == item.id }) ?? item
     }
 
     // MARK: - Actions

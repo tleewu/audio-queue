@@ -46,8 +46,8 @@ final class AudioEngine: ObservableObject {
     // MARK: - Public API
 
     func play(item: QueueItem) {
-        guard let urlString = item.audioURL, let url = URL(string: urlString) else {
-            print("AudioEngine: no audioURL on item \(item.title)")
+        guard let url = playbackURL(for: item) else {
+            print("AudioEngine: no playable URL for item \(item.title)")
             return
         }
 
@@ -115,6 +115,16 @@ final class AudioEngine: ObservableObject {
         }
 
         updateNowPlaying()
+    }
+
+    /// Proxy items stream through the backend relay (their upstream URLs expire
+    /// or are IP-locked to the server); everything else plays audioURL directly.
+    private func playbackURL(for item: QueueItem) -> URL? {
+        if item.isProxied {
+            return BackendConfig.streamURL(forItemId: item.id)
+        }
+        guard let urlString = item.audioURL else { return nil }
+        return URL(string: urlString)
     }
 
     func togglePlayPause() {

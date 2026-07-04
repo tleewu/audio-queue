@@ -13,6 +13,7 @@ vi.mock('../lib/prisma', () => ({
       delete: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+      count: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -21,6 +22,11 @@ vi.mock('../lib/prisma', () => ({
 // Mock dispatch to avoid real network calls
 vi.mock('../resolvers/resolver', () => ({
   dispatch: vi.fn(),
+}));
+
+// Mock the SSRF guard to avoid real DNS lookups
+vi.mock('../utils/urlGuard', () => ({
+  assertPublicHttpUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { prisma } from '../lib/prisma';
@@ -81,6 +87,7 @@ describe('Queue routes', () => {
   describe('POST /api/queue', () => {
     it('creates pending item and returns 201', async () => {
       vi.mocked(prisma.queueItem.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.queueItem.count).mockResolvedValue(0);
       const created = {
         id: 'new-1',
         originalURL: 'https://example.com/ep.mp3',
