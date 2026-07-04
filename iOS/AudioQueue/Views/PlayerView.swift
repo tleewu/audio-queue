@@ -216,12 +216,44 @@ struct PlayerView: View {
                 Image(systemName: "gobackward.15")
                     .font(.system(size: 22))
             }
+            sleepTimerMenu
             Button { engine.skip(by: 30) } label: {
                 Image(systemName: "goforward.30")
                     .font(.system(size: 22))
             }
         }
         .foregroundStyle(.primary)
+    }
+
+    // MARK: - Sleep Timer
+
+    private var sleepTimerMenu: some View {
+        Menu {
+            if engine.sleepTimerActive {
+                Button(role: .destructive) { engine.cancelSleepTimer() } label: {
+                    Label("Turn Off Timer", systemImage: "moon.zzz")
+                }
+                Divider()
+            }
+            ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) minutes") { engine.startSleepTimer(minutes: minutes) }
+            }
+            Button("End of episode") { engine.startSleepTimerEndOfEpisode() }
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: engine.sleepTimerActive ? "moon.fill" : "moon")
+                    .font(.system(size: 22))
+                if let remaining = engine.sleepTimerRemaining {
+                    Text(formatTime(remaining))
+                        .font(.caption2)
+                        .monospacedDigit()
+                } else if engine.sleepAtEndOfEpisode {
+                    Text("end of ep.")
+                        .font(.caption2)
+                }
+            }
+        }
+        .foregroundStyle(engine.sleepTimerActive ? Color.accentColor : .primary)
     }
 
     // MARK: - Spotify-style Action Row
