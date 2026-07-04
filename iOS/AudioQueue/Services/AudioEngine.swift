@@ -21,11 +21,18 @@ final class AudioEngine: ObservableObject {
     @Published var duration: Double = 0         // seconds
     @Published var playbackRate: Float = 1.0
 
+    // Sleep timer: countdown seconds remaining, or stop-at-end-of-episode
+    @Published var sleepTimerRemaining: Double?
+    @Published var sleepAtEndOfEpisode = false
+
+    var sleepTimerActive: Bool { sleepTimerRemaining != nil || sleepAtEndOfEpisode }
+
     // MARK: - Private
 
     private let player = AVPlayer()
     private var timeObserver: Any?
     private var itemEndObserver: NSObjectProtocol?
+    private var sleepTimerTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var lastPositionSave: Date = .distantPast
 
@@ -172,6 +179,42 @@ final class AudioEngine: ObservableObject {
         updateNowPlaying()
     }
 
+    // MARK: - Sleep Timer
+
+    /// Pauses playback after `minutes`. Replaces any running timer.
+    func startSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        sleepTimerRemaining = Double(minutes * 60)
+        sleepTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                guard let remaining = self.sleepTimerRemaining else { return }
+                let next = remaining - 1
+                if next <= 0 {
+                    self.sleepTimerRemaining = nil
+                    self.sleepTimerTask = nil
+                    if self.isPlaying { self.pause() }
+                    return
+                }
+                self.sleepTimerRemaining = next
+            }
+        }
+    }
+
+    /// Pauses playback when the current episode finishes instead of advancing.
+    func startSleepTimerEndOfEpisode() {
+        cancelSleepTimer()
+        sleepAtEndOfEpisode = true
+    }
+
+    func cancelSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerRemaining = nil
+        sleepAtEndOfEpisode = false
+    }
+
     /// Clears the current item and stops playback (e.g. when removing from queue).
     func clearCurrentItem() {
         savePositionNow()
@@ -265,6 +308,12 @@ final class AudioEngine: ObservableObject {
             }
             self?.isPlaying = false
             self?.currentTime = 0
+            // Sleep timer set to "end of episode": stop here instead of advancing
+            if self?.sleepAtEndOfEpisode == true {
+                self?.sleepAtEndOfEpisode = false
+                self?.updateNowPlaying()
+                return
+            }
             NotificationCenter.default.post(name: .audioEngineNextTrack, object: nil)
         }
     }
