@@ -33,6 +33,12 @@ final class AuthService: ObservableObject {
         isAuthenticated = false
     }
 
+    /// Permanently deletes the account server-side, then signs out locally.
+    func deleteAccount() async throws {
+        try await APIClient.shared.deleteAccount()
+        signOut()
+    }
+
     // MARK: - Credential state check
 
     private func checkCredentialState() {

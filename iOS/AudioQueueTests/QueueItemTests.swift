@@ -8,7 +8,8 @@ final class QueueItemTests: XCTestCase {
         audioURL: String? = "https://example.com/ep.mp3",
         resolveStatus: String = "resolved",
         durationSeconds: Int? = 3661,
-        isListened: Bool = false
+        isListened: Bool = false,
+        playbackType: String? = nil
     ) -> QueueItem {
         QueueItem(
             id: "test-1",
@@ -23,7 +24,8 @@ final class QueueItemTests: XCTestCase {
             thumbnailURL: nil,
             publisher: "Test Show",
             resolveStatus: resolveStatus,
-            resolveError: nil
+            resolveError: nil,
+            playbackType: playbackType
         )
     }
 
@@ -72,6 +74,31 @@ final class QueueItemTests: XCTestCase {
 
     func testIsOpenInApp_podcast() {
         XCTAssertFalse(makeItem(sourceType: "podcast").isOpenInApp)
+    }
+
+    // MARK: - Playback Type
+
+    func testEffectivePlaybackType_legacyFallback() {
+        // Pre-playbackType server rows: infer from audioURL presence
+        XCTAssertEqual(makeItem(audioURL: "https://cdn.example.com/a.mp3", playbackType: nil).effectivePlaybackType, "direct")
+        XCTAssertEqual(makeItem(audioURL: nil, playbackType: nil).effectivePlaybackType, "external")
+    }
+
+    func testProxyItemIsPlayable() {
+        let item = makeItem(sourceType: "youtube", audioURL: "https://upstream.example.com/a.m4a", playbackType: "proxy")
+        XCTAssertTrue(item.isPlayable)
+        XCTAssertTrue(item.isProxied)
+        XCTAssertFalse(item.isOpenInApp)
+    }
+
+    func testExternalItemOpensInApp() {
+        let item = makeItem(sourceType: "x", audioURL: nil, playbackType: "external")
+        XCTAssertFalse(item.isPlayable)
+        XCTAssertTrue(item.isOpenInApp)
+    }
+
+    func testDirectItemIsNotProxied() {
+        XCTAssertFalse(makeItem(playbackType: "direct").isProxied)
     }
 
     // MARK: - Formatted Duration

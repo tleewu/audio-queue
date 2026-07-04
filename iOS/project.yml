@@ -39,7 +39,7 @@ targets:
       properties:
         UIBackgroundModes:
           - audio
-        CFBundleDisplayName: Audio Queue
+        CFBundleDisplayName: cue
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -74,7 +74,7 @@ targets:
     info:
       path: ShareExtension/Info.plist
       properties:
-        CFBundleDisplayName: Add to Queue
+        CFBundleDisplayName: Add to cue
         NSExtension:
           NSExtensionAttributes:
             NSExtensionActivationRule:

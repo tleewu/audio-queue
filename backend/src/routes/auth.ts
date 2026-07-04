@@ -38,6 +38,20 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// DELETE /api/auth/account — permanently delete the user and all their data.
+// Required by App Store Review Guideline 5.1.1(v): apps with account creation
+// must offer in-app account deletion.
+router.delete('/account', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Queue items cascade via the FK
+    await prisma.user.delete({ where: { id: req.userId! } });
+    res.status(204).send();
+  } catch (err) {
+    console.error('Account deletion error:', err);
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 // GET /api/auth/me — validate token and return current user
 router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });

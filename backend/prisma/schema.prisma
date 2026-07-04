@@ -19,7 +19,7 @@ model User {
 model QueueItem {
   id              String   @id @default(cuid())
   userId          String
-  user            User     @relation(fields: [userId], references: [id])
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   originalURL     String
   title           String   @default("")
   sourceType      String   @default("unknown")
@@ -29,8 +29,15 @@ model QueueItem {
   publisher       String?
   resolveStatus   String   @default("pending")
   resolveError    String?
+  // How the client should play this item:
+  //   direct   — stream audioURL as-is (podcast CDNs, HLS)
+  //   proxy    — stream via GET /api/stream/:id (expiring/IP-locked URLs, e.g. yt-dlp)
+  //   external — no in-app audio; open originalURL in the source app
+  playbackType    String   @default("direct")
   isListened      Boolean  @default(false)
   position        Int      @default(0)
   savedAt         DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([userId, position])
 }

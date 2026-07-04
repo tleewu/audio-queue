@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { dispatch } from '../resolvers/resolver';
+import { assertPublicHttpUrl } from '../utils/urlGuard';
 
 const router = Router();
+
+const MAX_QUEUE_ITEMS = 500;
 
 // GET /api/queue — fetch user's items ordered by position
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -16,8 +19,21 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // POST /api/queue — insert pending item, fire-and-forget resolve
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url?: string };
-  if (!url) {
+  if (!url || typeof url !== 'string' || url.length > 2048) {
     res.status(400).json({ error: 'url required' });
+    return;
+  }
+
+  try {
+    await assertPublicHttpUrl(url.trim());
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+    return;
+  }
+
+  const count = await prisma.queueItem.count({ where: { userId: req.userId! } });
+  if (count >= MAX_QUEUE_ITEMS) {
+    res.status(400).json({ error: `Queue limit of ${MAX_QUEUE_ITEMS} items reached` });
     return;
   }
 
@@ -31,14 +47,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   const item = await prisma.queueItem.create({
     data: {
       userId: req.userId!,
-      originalURL: url,
-      title: url,
+      originalURL: url.trim(),
+      title: url.trim(),
       position,
       resolveStatus: 'pending',
     },
   });
 
-  resolveInBackground(item.id, url);
+  resolveInBackground(item.id, url.trim());
   res.status(201).json(item);
 });
 
@@ -58,14 +74,25 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 
 // PATCH /api/queue/reorder — bulk position update
 router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
-  const { order } = req.body as { order?: Array<{ id: string; position: number }> };
-  if (!Array.isArray(order)) {
+  const { order } = req.body as { order?: Array<{ id: string; position: number | string }> };
+  if (!Array.isArray(order) || order.length > 1000) {
     res.status(400).json({ error: 'order array required' });
     return;
   }
 
+  // Older clients send position as a string — coerce and validate
+  const updates: Array<{ id: string; position: number }> = [];
+  for (const entry of order) {
+    const position = Number(entry?.position);
+    if (typeof entry?.id !== 'string' || !Number.isInteger(position)) {
+      res.status(400).json({ error: 'order entries must be {id, position}' });
+      return;
+    }
+    updates.push({ id: entry.id, position });
+  }
+
   await prisma.$transaction(
-    order.map(({ id, position }) =>
+    updates.map(({ id, position }) =>
       prisma.queueItem.updateMany({
         where: { id, userId: req.userId! },
         data: { position },
@@ -99,20 +126,23 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
 async function resolveInBackground(itemId: string, url: string): Promise<void> {
   try {
     const resolved = await dispatch(url);
-    // 'youtube' items intentionally have no audioURL (opens in YouTube app) — mark resolved not failed
-    const isExternal = resolved.sourceType === 'youtube' && !resolved.audioURL;
+    // 'external' items intentionally have no audioURL (open in the source app) —
+    // resolved as long as we know where to send the user; only 'unsupported' fails.
+    const isExternal = resolved.playbackType === 'external' && resolved.sourceType !== 'unsupported';
+    const ok = !!resolved.audioURL || isExternal;
     // updateMany is a no-op when the item was deleted before resolution finished
     await prisma.queueItem.updateMany({
       where: { id: itemId },
       data: {
         title: resolved.title || url,
         sourceType: resolved.sourceType,
+        playbackType: resolved.playbackType,
         audioURL: resolved.audioURL ?? null,
         durationSeconds: resolved.durationSeconds ?? null,
         thumbnailURL: resolved.thumbnailURL ?? null,
         publisher: resolved.publisher ?? null,
-        resolveStatus: resolved.audioURL || isExternal ? 'resolved' : 'failed',
-        resolveError: resolved.audioURL || isExternal ? null : 'No audio stream found',
+        resolveStatus: ok ? 'resolved' : 'failed',
+        resolveError: ok ? null : 'No audio stream found',
       },
     });
   } catch (err) {

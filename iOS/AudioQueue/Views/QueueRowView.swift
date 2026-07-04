@@ -121,7 +121,7 @@ struct QueueRowView: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        if item.sourceType == "youtube" && item.audioURL == nil && item.isResolved {
+        if item.isResolved && item.effectivePlaybackType == "external" && !item.isUnsupported {
             Image(systemName: "play.rectangle")
                 .foregroundStyle(.red)
                 .font(.caption)

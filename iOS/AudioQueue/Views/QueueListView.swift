@@ -11,6 +11,7 @@ struct QueueListView: View {
     @ObservedObject private var engine = AudioEngine.shared
 
     @State private var showAddURL = false
+    @State private var showSettings = false
     @State private var currentPlayIndex = 0
     @State private var selectedTab: QueueTab = .queue
     @State private var isReordering = false
@@ -101,6 +102,9 @@ struct QueueListView: View {
                 }
             }
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(authService: AuthService.shared)
+        }
         .onReceive(
             NotificationCenter.default.publisher(for: .playerViewModelAdvance)
         ) { _ in
@@ -121,6 +125,14 @@ struct QueueListView: View {
                 }
                 .fontWeight(.semibold)
             } else {
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+
                 Spacer()
                 tabToggleButton(tab: .queue, icon: "list.bullet")
                 tabToggleButton(tab: .archive, icon: "checkmark.square")
