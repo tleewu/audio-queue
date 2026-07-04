@@ -102,10 +102,26 @@ router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
   res.json({ ok: true });
 });
 
-// PATCH /api/queue/:id — update isListened
+// PATCH /api/queue/:id — update isListened and/or playbackPositionSeconds
 router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { isListened } = req.body as { isListened?: boolean };
+  const { isListened, playbackPositionSeconds } = req.body as {
+    isListened?: boolean;
+    playbackPositionSeconds?: number;
+  };
+
+  const data: { isListened?: boolean; playbackPositionSeconds?: number } = {};
+  if (typeof isListened === 'boolean') {
+    data.isListened = isListened;
+  }
+  if (playbackPositionSeconds !== undefined) {
+    const secs = Number(playbackPositionSeconds);
+    if (!Number.isFinite(secs) || secs < 0) {
+      res.status(400).json({ error: 'playbackPositionSeconds must be a non-negative number' });
+      return;
+    }
+    data.playbackPositionSeconds = Math.floor(secs);
+  }
 
   const item = await prisma.queueItem.findFirst({
     where: { id, userId: req.userId! },
@@ -117,7 +133,7 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
 
   const updated = await prisma.queueItem.update({
     where: { id },
-    data: { isListened: isListened ?? item.isListened },
+    data,
   });
   res.json(updated);
 });

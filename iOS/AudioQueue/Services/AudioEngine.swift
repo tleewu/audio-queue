@@ -28,8 +28,11 @@ final class AudioEngine: ObservableObject {
     private var itemEndObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
     private var lastPositionSave: Date = .distantPast
+    private var lastServerPositionSync: Date = .distantPast
 
     private static let positionKey = "playbackPositions"
+    /// Server sync is coarser than local saves — a resume point, not a live scrubber
+    private static let serverSyncInterval: TimeInterval = 15
 
     let supportedRates: [Float] = [0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -52,7 +55,10 @@ final class AudioEngine: ObservableObject {
         }
 
         savePositionNow()
-        let savedPos = savedPosition(for: item.id)
+        // Local position wins (freshest); fall back to the server-synced resume
+        // point so playback continues where another device left off.
+        let serverPos = (item.playbackPositionSeconds).flatMap { $0 > 0 ? Double($0) : nil }
+        let savedPos = savedPosition(for: item.id) ?? serverPos
         print("AudioEngine: loading \(url.absoluteString) savedPos=\(savedPos ?? 0)")
         let playerItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: playerItem)
@@ -324,6 +330,17 @@ final class AudioEngine: ObservableObject {
         var positions = UserDefaults.standard.dictionary(forKey: Self.positionKey) as? [String: Double] ?? [:]
         positions[id] = currentTime
         UserDefaults.standard.set(positions, forKey: Self.positionKey)
+        syncPositionToServerThrottled(itemId: id, seconds: currentTime)
+    }
+
+    /// Fire-and-forget server sync so other devices can resume from here.
+    private func syncPositionToServerThrottled(itemId: String, seconds: Double) {
+        let now = Date()
+        guard now.timeIntervalSince(lastServerPositionSync) >= Self.serverSyncInterval else { return }
+        lastServerPositionSync = now
+        Task {
+            try? await APIClient.shared.updatePlaybackPosition(id: itemId, seconds: Int(seconds))
+        }
     }
 
     func savedPosition(for itemId: String) -> Double? {
@@ -335,5 +352,9 @@ final class AudioEngine: ObservableObject {
         var positions = UserDefaults.standard.dictionary(forKey: Self.positionKey) as? [String: Double] ?? [:]
         positions.removeValue(forKey: itemId)
         UserDefaults.standard.set(positions, forKey: Self.positionKey)
+        // Reset the server resume point too — the item played to the end
+        Task {
+            try? await APIClient.shared.updatePlaybackPosition(id: itemId, seconds: 0)
+        }
     }
 }

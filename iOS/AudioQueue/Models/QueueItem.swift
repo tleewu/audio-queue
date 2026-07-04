@@ -18,6 +18,8 @@ struct QueueItem: Identifiable, Codable, Equatable {
     /// "external" (open originalURL in the source app). Optional for
     /// backwards compatibility with pre-playbackType server responses.
     var playbackType: String?
+    /// Server-synced resume point in seconds (cross-device continue listening)
+    var playbackPositionSeconds: Int?
 }
 
 // MARK: - Convenience
