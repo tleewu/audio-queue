@@ -191,6 +191,32 @@ describe('Queue routes', () => {
       });
     });
 
+    it('updates playbackPositionSeconds', async () => {
+      vi.mocked(prisma.queueItem.findFirst).mockResolvedValue({ id: 'item-1', userId: USER_ID } as any);
+      vi.mocked(prisma.queueItem.update).mockResolvedValue({ id: 'item-1', playbackPositionSeconds: 754 } as any);
+
+      const res = await request(app)
+        .patch('/api/queue/item-1')
+        .set('Authorization', `Bearer ${authToken()}`)
+        .send({ playbackPositionSeconds: 754.6 });
+
+      expect(res.status).toBe(200);
+      expect(prisma.queueItem.update).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+        data: { playbackPositionSeconds: 754 },
+      });
+    });
+
+    it('rejects negative playbackPositionSeconds', async () => {
+      const res = await request(app)
+        .patch('/api/queue/item-1')
+        .set('Authorization', `Bearer ${authToken()}`)
+        .send({ playbackPositionSeconds: -5 });
+
+      expect(res.status).toBe(400);
+      expect(prisma.queueItem.update).not.toHaveBeenCalled();
+    });
+
     it('returns 404 for non-existent item', async () => {
       vi.mocked(prisma.queueItem.findFirst).mockResolvedValue(null);
 

@@ -239,7 +239,10 @@ struct QueueListView: View {
         if engine.currentItem?.id == item.id {
             return engine.currentTime > 0 ? engine.currentTime : nil
         }
-        return engine.savedPosition(for: item.id)
+        if let local = engine.savedPosition(for: item.id) { return local }
+        // Fresh install / other device: show the server-synced resume point
+        if let server = item.playbackPositionSeconds, server > 0 { return Double(server) }
+        return nil
     }
 
     private func progressFor(_ item: QueueItem) -> Double? {

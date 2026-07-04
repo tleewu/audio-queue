@@ -34,6 +34,8 @@ model QueueItem {
   //   proxy    — stream via GET /api/stream/:id (expiring/IP-locked URLs, e.g. yt-dlp)
   //   external — no in-app audio; open originalURL in the source app
   playbackType    String   @default("direct")
+  // Resume point in seconds, synced across devices (0 = start from beginning)
+  playbackPositionSeconds Int @default(0)
   isListened      Boolean  @default(false)
   position        Int      @default(0)
   savedAt         DateTime @default(now())

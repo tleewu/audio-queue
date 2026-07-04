@@ -105,6 +105,14 @@ actor APIClient {
         return try await perform(req)
     }
 
+    /// Syncs the resume point so other devices can continue where this one left off.
+    func updatePlaybackPosition(id: String, seconds: Int) async throws {
+        var req = try buildRequest(path: "/api/queue/\(id)", method: "PATCH")
+        req.httpBody = try JSONEncoder().encode(["playbackPositionSeconds": seconds])
+        let (_, response) = try await URLSession.shared.data(for: req)
+        try checkStatus(response)
+    }
+
     private struct ReorderEntry: Encodable {
         let id: String
         let position: Int
