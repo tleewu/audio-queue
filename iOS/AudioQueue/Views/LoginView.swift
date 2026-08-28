@@ -10,13 +10,8 @@ struct LoginView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "headphones")
-                .font(.system(size: 72))
-                .foregroundStyle(.primary)
-
             Text("cue")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(.system(size: 64, weight: .bold, design: .rounded))
 
             Text("Save now, listen later.\nSign in to sync your queue across devices.")
                 .font(.subheadline)

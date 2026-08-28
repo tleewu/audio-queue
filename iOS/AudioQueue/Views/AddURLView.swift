@@ -16,7 +16,7 @@ struct AddURLView: View {
         NavigationStack {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Paste a link to a podcast episode, YouTube video, SoundCloud track, or any audio URL.")
+                    Text("Paste a link. Podcast episodes play in cue; anything else opens in a web view.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -34,7 +34,8 @@ struct AddURLView: View {
                     onAdd(trimmed)
                     dismiss()
                 } label: {
-                    Label("Add to Queue", systemImage: "plus.circle.fill")
+                    Text("Add to Queue")
+                        .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(isValidURL ? Color.accentColor : Color.secondary.opacity(0.3))

@@ -1,146 +1,62 @@
 import SwiftUI
 
+/// One line in the queue: title, publisher, and how much is left. Text only.
 struct QueueRowView: View {
     let item: QueueItem
-    var isCurrentItem: Bool = false
+    var isCurrent: Bool = false
     var isPlaying: Bool = false
-    var progress: Double? = nil
     var secondsRemaining: Double? = nil
-    var onPlayPause: (() -> Void)? = nil
-    var onOpenInApp: (() -> Void)? = nil
+    var onPlayPause: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 14) {
-            thumbnail
-            info
-            Spacer()
-            if item.isPlayable, let onPlayPause = onPlayPause {
-                Button(action: onPlayPause) {
-                    Image(systemName: isCurrentItem && isPlaying ? "pause.fill" : "play.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.accentColor)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-            } else {
-                statusBadge
-            }
-        }
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onOpenInApp?()
-        }
-    }
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.subheadline)
+                    .fontWeight(isCurrent ? .semibold : .medium)
+                    .foregroundStyle(isCurrent ? Color.accentColor : .primary)
+                    .lineLimit(3)
 
-    // MARK: - Thumbnail
-
-    private var thumbnail: some View {
-        Group {
-            if let urlStr = item.thumbnailURL, let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        placeholderIcon
-                    }
-                }
-            } else {
-                placeholderIcon
-            }
-        }
-        .frame(width: 72, height: 72)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var placeholderIcon: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.secondary.opacity(0.15))
-            Text(item.sourceEmoji)
-                .font(.title2)
-        }
-    }
-
-    // MARK: - Info
-
-    private var info: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(item.title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .lineLimit(2)
-
-            if let publisher = item.publisher {
-                Text(publisher)
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
-            durationOrProgress
-        }
-    }
+            Spacer(minLength: 8)
 
-    @ViewBuilder
-    private var durationOrProgress: some View {
-        if let progress, progress > 0, let remaining = secondsRemaining {
-            HStack(spacing: 8) {
-                Text(formatRemaining(remaining))
+            if item.isPodcast {
+                Button(action: onPlayPause) {
+                    Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentColor)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Web")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize()
-                progressCapsule(fraction: progress)
-                    .frame(width: 50, height: 12)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
             }
+        }
+        .padding(.vertical, 8)
+    }
+
+    /// "Publisher · 42 min left" — whichever parts we know.
+    private var subtitle: String {
+        var parts: [String] = []
+        if let publisher = item.publisher, !publisher.isEmpty { parts.append(publisher) }
+        if let secondsRemaining {
+            parts.append(formatRemaining(secondsRemaining))
         } else if let duration = item.formattedDuration {
-            Text(duration)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            parts.append(duration)
         }
-    }
-
-    private func progressCapsule(fraction: Double) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(height: 3)
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: geo.size.width * min(fraction, 1.0), height: 3)
-            }
-            .frame(maxHeight: .infinity, alignment: .center)
-        }
-    }
-
-    // MARK: - Helpers (formatRemaining from Utils/Formatters.swift)
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        if item.isResolved && item.effectivePlaybackType == "external" && !item.isUnsupported {
-            Image(systemName: "play.rectangle")
-                .foregroundStyle(.red)
-                .font(.caption)
-        } else if item.isUnsupported {
-            Image(systemName: "safari")
-                .foregroundStyle(.blue)
-                .font(.caption)
-        } else {
-            switch item.resolveStatus {
-            case "pending":
-                ProgressView()
-                    .scaleEffect(0.7)
-            case "failed":
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            default:
-                EmptyView()
-            }
-        }
+        return parts.joined(separator: " · ")
     }
 }

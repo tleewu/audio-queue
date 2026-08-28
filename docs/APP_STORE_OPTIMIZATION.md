@@ -67,7 +67,7 @@ Alternates:
 Most users decide from the first 1–3 screenshots shown directly in search results; captions are OCR-indexed. Order:
 
 1. **"Save now. Listen later."** — queue view, readable at thumbnail size.
-2. **"Share anything, hear everything"** — share sheet catching a Spotify episode, a YouTube video, an article. The magic moment; must be in the first three.
+2. **"Share anything, hear everything"** — share sheet catching a Spotify episode, an Apple Podcasts link, an article. The magic moment; must be in the first three.
 3. **"One continuous audio queue"** — playlist view (indexes "audio queue").
 4. **"A real podcast player"** — lock screen controls, speed chips, background audio.
 5. **"Your commute, sorted"** — lifestyle frame.

@@ -6,102 +6,89 @@ final class QueueViewModelTests: XCTestCase {
 
     private func makeItem(
         id: String = UUID().uuidString,
-        sourceType: String = "podcast",
         audioURL: String? = "https://cdn.example.com/ep.mp3",
-        resolveStatus: String = "resolved",
         isListened: Bool = false,
-        savedAt: Date = Date(),
-        position: Int = 0
+        position: Int = 0,
+        savedAt: Date = Date()
     ) -> QueueItem {
         QueueItem(
             id: id,
             originalURL: "https://example.com",
             title: "Episode \(id)",
-            sourceType: sourceType,
+            publisher: "Show",
             audioURL: audioURL,
             durationSeconds: 1800,
-            savedAt: savedAt,
-            position: position,
             isListened: isListened,
-            thumbnailURL: nil,
-            publisher: "Show",
-            resolveStatus: resolveStatus,
-            resolveError: nil
+            position: position,
+            savedAt: savedAt
         )
     }
 
-    // MARK: - sortedQueue
-
-    func testSortedQueue_returnsUnlistenedOnly() {
+    private func makeVM(_ items: [QueueItem]) -> QueueViewModel {
         let vm = QueueViewModel()
-        vm.allItems = [
-            makeItem(id: "a", isListened: false),
-            makeItem(id: "b", isListened: true),
-            makeItem(id: "c", isListened: false),
-        ]
-
-        let sorted = vm.sortedQueue
-        XCTAssertEqual(sorted.count, 2)
-        XCTAssertTrue(sorted.allSatisfy { !$0.isListened })
+        vm.items = items
+        return vm
     }
 
-    func testSortedQueue_delegatesToQueueAlgorithm() {
-        let vm = QueueViewModel()
-        let recent = makeItem(id: "recent", savedAt: Date())
-        let veryOld = makeItem(id: "old", savedAt: Date(timeIntervalSinceNow: -86400 * 15))
-        vm.allItems = [veryOld, recent]
+    // MARK: - queue
 
-        let sorted = vm.sortedQueue
-        XCTAssertEqual(sorted.first?.id, "recent")
+    func testQueueReturnsUnlistenedInPositionOrder() {
+        let vm = makeVM([
+            makeItem(id: "a", position: 0),
+            makeItem(id: "b", isListened: true, position: 1),
+            makeItem(id: "c", position: 2),
+        ])
+
+        XCTAssertEqual(vm.queue.map(\.id), ["a", "c"])
     }
 
-    // MARK: - archivedItems
+    // MARK: - archive
 
-    func testArchivedItems_returnsListenedOnly() {
-        let vm = QueueViewModel()
-        vm.allItems = [
-            makeItem(id: "a", isListened: false),
-            makeItem(id: "b", isListened: true),
-            makeItem(id: "c", isListened: true),
-        ]
+    func testArchiveReturnsListenedNewestFirst() {
+        let vm = makeVM([
+            makeItem(id: "older", isListened: true, savedAt: Date(timeIntervalSinceNow: -86400)),
+            makeItem(id: "newer", isListened: true, savedAt: Date()),
+            makeItem(id: "unlistened"),
+        ])
 
-        let archived = vm.archivedItems
-        XCTAssertEqual(archived.count, 2)
-        XCTAssertTrue(archived.allSatisfy { $0.isListened })
+        XCTAssertEqual(vm.archive.map(\.id), ["newer", "older"])
     }
 
-    func testArchivedItems_sortedNewestFirst() {
-        let vm = QueueViewModel()
-        let older = makeItem(id: "older", isListened: true, savedAt: Date(timeIntervalSinceNow: -86400))
-        let newer = makeItem(id: "newer", isListened: true, savedAt: Date())
-        vm.allItems = [older, newer]
+    // MARK: - move
 
-        let archived = vm.archivedItems
-        XCTAssertEqual(archived.first?.id, "newer")
-        XCTAssertEqual(archived.last?.id, "older")
+    func testMoveReordersQueueAndKeepsArchivedItems() {
+        let vm = makeVM([
+            makeItem(id: "a", position: 0),
+            makeItem(id: "b", position: 1),
+            makeItem(id: "c", position: 2),
+            makeItem(id: "listened", isListened: true, position: 3),
+        ])
+
+        vm.move(from: IndexSet(integer: 0), to: 3) // a to the end
+
+        XCTAssertEqual(vm.queue.map(\.id), ["b", "c", "a"])
+        XCTAssertEqual(vm.items.count, 4)
+        XCTAssertTrue(vm.items.contains { $0.id == "listened" })
     }
 
-    // MARK: - moveItems
+    // MARK: - setListened
 
-    func testMoveItems_preservesAllItems() {
-        let vm = QueueViewModel()
-        let a = makeItem(id: "a", savedAt: Date())
-        let b = makeItem(id: "b", savedAt: Date(timeIntervalSinceNow: -1))
-        let c = makeItem(id: "c", savedAt: Date(timeIntervalSinceNow: -2))
-        let listened = makeItem(id: "listened", isListened: true)
-        vm.allItems = [a, b, c, listened]
+    func testSetListenedMovesItemToArchiveImmediately() {
+        let vm = makeVM([makeItem(id: "a"), makeItem(id: "b")])
 
-        let sorted = vm.sortedQueue
-        XCTAssertEqual(sorted.count, 3)
+        vm.setListened(vm.queue[0], true)
 
-        // Move first item to last position in the sorted subset
-        vm.moveItems(from: IndexSet(integer: 0), to: 3)
+        XCTAssertEqual(vm.queue.map(\.id), ["b"])
+        XCTAssertEqual(vm.archive.map(\.id), ["a"])
+    }
 
-        // allItems should still contain all 4 items (3 unlistened + 1 listened)
-        XCTAssertEqual(vm.allItems.count, 4)
-        XCTAssertTrue(vm.allItems.contains(where: { $0.id == "listened" }))
-        XCTAssertTrue(vm.allItems.contains(where: { $0.id == "a" }))
-        XCTAssertTrue(vm.allItems.contains(where: { $0.id == "b" }))
-        XCTAssertTrue(vm.allItems.contains(where: { $0.id == "c" }))
+    // MARK: - delete
+
+    func testDeleteRemovesItemImmediately() {
+        let vm = makeVM([makeItem(id: "a"), makeItem(id: "b")])
+
+        vm.delete(vm.queue[0])
+
+        XCTAssertEqual(vm.items.map(\.id), ["b"])
     }
 }

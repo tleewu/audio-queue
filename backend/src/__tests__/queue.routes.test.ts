@@ -19,9 +19,9 @@ vi.mock('../lib/prisma', () => ({
   },
 }));
 
-// Mock dispatch to avoid real network calls
-vi.mock('../resolvers/resolver', () => ({
-  dispatch: vi.fn(),
+// Mock resolution to avoid real network calls
+vi.mock('../resolvers/podcast', () => ({
+  resolve: vi.fn(),
 }));
 
 // Mock the SSRF guard to avoid real DNS lookups
@@ -30,6 +30,7 @@ vi.mock('../utils/urlGuard', () => ({
 }));
 
 import { prisma } from '../lib/prisma';
+import { resolve } from '../resolvers/podcast';
 import queueRouter from '../routes/queue';
 import { requireAuth } from '../middleware/auth';
 
@@ -54,6 +55,7 @@ describe('Queue routes', () => {
   beforeEach(() => {
     app = makeApp();
     vi.clearAllMocks();
+    vi.mocked(resolve).mockResolvedValue({ title: 'Resolved title' });
   });
 
   // GET /api/queue
@@ -85,29 +87,72 @@ describe('Queue routes', () => {
 
   // POST /api/queue
   describe('POST /api/queue', () => {
-    it('creates pending item and returns 201', async () => {
+    it('saves a resolved podcast episode and returns 201', async () => {
       vi.mocked(prisma.queueItem.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.queueItem.count).mockResolvedValue(0);
-      const created = {
-        id: 'new-1',
-        originalURL: 'https://example.com/ep.mp3',
-        title: 'https://example.com/ep.mp3',
-        position: 0,
-        resolveStatus: 'pending',
-        userId: USER_ID,
-      };
-      vi.mocked(prisma.queueItem.create).mockResolvedValue(created as any);
-      // resolveInBackground calls dispatch then updateMany — mock updateMany to no-op
-      vi.mocked(prisma.queueItem.updateMany).mockResolvedValue({ count: 1 } as any);
+      vi.mocked(resolve).mockResolvedValue({
+        title: 'Episode 42',
+        publisher: 'The Show',
+        audioURL: 'https://cdn.example.com/ep.mp3',
+        durationSeconds: 1800,
+      });
+      vi.mocked(prisma.queueItem.create).mockResolvedValue({ id: 'new-1' } as any);
 
       const res = await request(app)
         .post('/api/queue')
         .set('Authorization', `Bearer ${authToken()}`)
-        .send({ url: 'https://example.com/ep.mp3' });
+        .send({ url: 'https://open.spotify.com/episode/abc' });
 
       expect(res.status).toBe(201);
       expect(res.body.id).toBe('new-1');
-      expect(prisma.queueItem.create).toHaveBeenCalled();
+      expect(prisma.queueItem.create).toHaveBeenCalledWith({
+        data: {
+          userId: USER_ID,
+          originalURL: 'https://open.spotify.com/episode/abc',
+          title: 'Episode 42',
+          publisher: 'The Show',
+          audioURL: 'https://cdn.example.com/ep.mp3',
+          durationSeconds: 1800,
+          position: 0,
+        },
+      });
+    });
+
+    it('saves a web item when nothing resolves as a podcast', async () => {
+      vi.mocked(prisma.queueItem.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.queueItem.count).mockResolvedValue(0);
+      vi.mocked(resolve).mockResolvedValue({ title: 'An essay', publisher: 'Example Blog' });
+      vi.mocked(prisma.queueItem.create).mockResolvedValue({ id: 'new-2' } as any);
+
+      const res = await request(app)
+        .post('/api/queue')
+        .set('Authorization', `Bearer ${authToken()}`)
+        .send({ url: 'https://example.com/essay' });
+
+      expect(res.status).toBe(201);
+      expect(vi.mocked(prisma.queueItem.create).mock.calls[0][0].data).toMatchObject({
+        title: 'An essay',
+        audioURL: null,
+        durationSeconds: null,
+      });
+    });
+
+    it('still saves the link when resolution throws', async () => {
+      vi.mocked(prisma.queueItem.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.queueItem.count).mockResolvedValue(0);
+      vi.mocked(resolve).mockRejectedValue(new Error('listen notes down'));
+      vi.mocked(prisma.queueItem.create).mockResolvedValue({ id: 'new-3' } as any);
+
+      const res = await request(app)
+        .post('/api/queue')
+        .set('Authorization', `Bearer ${authToken()}`)
+        .send({ url: 'https://example.com/essay' });
+
+      expect(res.status).toBe(201);
+      expect(vi.mocked(prisma.queueItem.create).mock.calls[0][0].data).toMatchObject({
+        title: 'https://example.com/essay',
+        audioURL: null,
+      });
     });
 
     it('returns 400 when url is missing', async () => {

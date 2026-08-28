@@ -6,21 +6,13 @@ enum APIError: Error {
     case noData
 }
 
-/// Backend location, shared by APIClient (JSON API) and AudioEngine (stream proxy URLs).
+/// Backend location. Point the app at a local server with the
+/// AUDIO_QUEUE_BACKEND_URL scheme environment variable.
 enum BackendConfig {
     static let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
             ?? "https://audio-queue-production.up.railway.app"
     }()
-
-    /// Streaming URL for a proxy-playback item. AVPlayer performs its own
-    /// (Range) requests, so authentication travels as a query token.
-    static func streamURL(forItemId id: String) -> URL? {
-        guard let token = KeychainService.loadToken(),
-              var components = URLComponents(string: "\(baseURL)/api/stream/\(id)") else { return nil }
-        components.queryItems = [URLQueryItem(name: "token", value: token)]
-        return components.url
-    }
 }
 
 actor APIClient {
@@ -93,15 +85,9 @@ actor APIClient {
         try checkStatus(response)
     }
 
-    func markListened(id: String) async throws -> QueueItem {
+    func setListened(id: String, isListened: Bool) async throws -> QueueItem {
         var req = try buildRequest(path: "/api/queue/\(id)", method: "PATCH")
-        req.httpBody = try JSONEncoder().encode(["isListened": true])
-        return try await perform(req)
-    }
-
-    func markUnlistened(id: String) async throws -> QueueItem {
-        var req = try buildRequest(path: "/api/queue/\(id)", method: "PATCH")
-        req.httpBody = try JSONEncoder().encode(["isListened": false])
+        req.httpBody = try JSONEncoder().encode(["isListened": isListened])
         return try await perform(req)
     }
 
@@ -125,7 +111,7 @@ actor APIClient {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 35
+        req.timeoutInterval = 30
         if auth {
             if let token = KeychainService.loadToken() {
                 req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

@@ -1,27 +1,24 @@
 # cue
 
-**Save now, listen later.** Share podcast episodes, YouTube/X videos, and articles into cue from any app, and it builds one continuous audio queue you can listen to like a podcast — background audio, lock-screen controls, playback speed, progress memory.
+**Save now, listen later.** Share a link to cue. If it's a podcast episode, it goes into your audio queue — background audio, lock-screen controls, playback speed, progress memory. If it isn't, it's saved as a web item and opens in a web view.
 
 ## How it works
 
 ```
 iOS app (SwiftUI)  ──►  backend (Express + Prisma + Postgres, Railway)
       │                       │
-  share sheet             resolver pipeline
-  AVPlayer  ◄──────  direct CDN audio, or /api/stream proxy
+  share sheet          page title → Listen Notes episode search
+      │                       │
+  AVPlayer  ◄─── episode audio (CDN)   ·   no match ─► web view
 ```
 
-Every saved link is resolved server-side into the best playable form:
+Resolution is one path, run server-side while the link is being saved:
 
-| Source | Resolution | Playback |
-|---|---|---|
-| Spotify / Apple Podcasts links | Podcast directories (Listen Notes → Podcast Index → iTunes lookup) map the link to the exact episode's own CDN audio. Never plays from the platform page. | `direct` |
-| YouTube | 1) episode match on a podcast RSS feed → direct audio; 2) yt-dlp audio extraction → streamed through the backend proxy; 3) fallback: opens in the YouTube app | `direct` / `proxy` / `external` |
-| X (Twitter) video | yt-dlp extraction → backend proxy; fallback opens in the X app | `proxy` / `external` |
-| RSS feeds, direct audio files, Substack | parsed directly | `direct` |
-| SoundCloud, Vimeo, and anything else yt-dlp supports | yt-dlp (HLS plays direct; progressive URLs proxied) | `direct` / `proxy` |
+1. Fetch the shared page and read its title (and show/channel name, when the page exposes one).
+2. Search [Listen Notes](https://www.listennotes.com/api/) for an episode with that title. A close enough title match — with the show name breaking ties — wins.
+3. A match returns the episode's own CDN audio, so playback never depends on the platform page. No match means the link is saved as a web item and opened in `SFSafariViewController`.
 
-`proxy` playback exists because yt-dlp stream URLs expire and are often IP-locked to the resolving server. `GET /api/stream/:id` relays the audio with Range support (seeking) and transparently re-resolves expired upstream URLs.
+Nothing is ever dropped: an unreachable page, a missing API key or a failed search all end in the same place — a web item.
 
 ## Backend
 
@@ -40,8 +37,7 @@ npm test           # vitest
 | `DATABASE_URL` | yes | Postgres connection string |
 | `JWT_SECRET` | yes | signs session tokens (90-day expiry) |
 | `IOS_BUNDLE_ID` | yes | audience check for Sign in with Apple token verification |
-| `PODCAST_INDEX_API_KEY` / `PODCAST_INDEX_API_SECRET` | recommended | free podcast directory ([api.podcastindex.org](https://api.podcastindex.org)) used for show→feed lookup |
-| `LISTEN_NOTES_API_KEY` | optional | enables Listen Notes episode-level search ([listennotes.com/api](https://www.listennotes.com/api/)) — the strongest episode matcher; pipeline falls back to Podcast Index without it |
+| `LISTEN_NOTES_API_KEY` | yes, in practice | [Listen Notes](https://www.listennotes.com/api/) episode search — without it every link becomes a web item |
 | `SUPPORT_EMAIL` | optional | shown on /privacy, /support, /terms pages |
 | `PORT` | no | defaults to 8080 |
 
@@ -50,10 +46,10 @@ npm test           # vitest
 - `POST /api/auth/apple` — Sign in with Apple → JWT
 - `GET /api/auth/me` — token validation
 - `DELETE /api/auth/account` — permanent account + data deletion (App Store 5.1.1(v))
-- `GET/POST/PATCH/DELETE /api/queue…` — queue CRUD (auth required)
-- `GET /api/stream/:id?token=…` — authenticated audio relay for proxy items
-- `POST /api/resolve` — resolve a URL without saving (auth required)
+- `GET/POST/PATCH/DELETE /api/queue…` — queue CRUD (auth required). `POST` resolves the link before replying, so the item comes back final.
 - `GET /privacy`, `/support`, `/terms` — static pages for the App Store listing
+
+A queue item is a podcast episode when `audioURL` is set and a web item when it isn't; the client needs no other classification.
 
 Security: helmet, per-route rate limits, 64 KB body limit, SSRF guard on user-supplied URLs (private/link-local address ranges are rejected before any fetch).
 
@@ -64,6 +60,8 @@ Xcode project in `iOS/` (generated with XcodeGen from `project.yml`; the checked
 - `AudioQueue/` — app target (SwiftUI). Display name: **cue**.
 - `ShareExtension/` — "Add to cue" share sheet target; hands URLs to the app via the App Group.
 - `AudioQueueTests/` — unit tests.
+
+The interface is text only — no artwork, thumbnails or episode images anywhere. One screen holds the header, the queue, and a player bar that opens the full-screen player; `AudioEngine` owns the AVPlayer, the play order, and position memory.
 
 Point the app at a local backend with the `AUDIO_QUEUE_BACKEND_URL` scheme environment variable.
 

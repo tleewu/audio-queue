@@ -41,29 +41,3 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   req.userId = userId;
   next();
 }
-
-/**
- * Like requireAuth, but also accepts `?token=<jwt>` — AVPlayer streams media
- * with its own URL loading system, and query-string auth is the only channel
- * guaranteed to survive every request it makes (including range retries).
- */
-export function requireAuthAllowQueryToken(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization;
-  if (header?.startsWith('Bearer ')) {
-    return requireAuth(req, res, next);
-  }
-
-  if (!process.env.JWT_SECRET) {
-    res.status(500).json({ error: 'Server misconfigured' });
-    return;
-  }
-
-  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
-  const userId = queryToken ? verifyToken(queryToken) : null;
-  if (!userId) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-  req.userId = userId;
-  next();
-}
