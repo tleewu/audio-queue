@@ -63,6 +63,7 @@ targets:
       - sdk: AVFoundation.framework
       - sdk: MediaPlayer.framework
       - sdk: AuthenticationServices.framework
+      - sdk: SafariServices.framework
       - target: ShareExtension
 
   ShareExtension:

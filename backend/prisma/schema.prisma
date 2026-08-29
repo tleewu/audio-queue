@@ -8,32 +8,29 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
+/// Everyone starts as an anonymous device account. Signing in with Apple
+/// attaches `appleUserId` to that same row (or merges it into the existing
+/// Apple account), so the queue survives the upgrade.
 model User {
   id          String      @id @default(cuid())
-  appleUserId String      @unique
+  deviceId    String?     @unique
+  appleUserId String?     @unique
   email       String?
   createdAt   DateTime    @default(now())
   queueItems  QueueItem[]
 }
 
+/// A saved link. `audioURL` set = podcast episode the app plays;
+/// `audioURL` null = web item the app opens in a web view.
 model QueueItem {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   originalURL     String
   title           String   @default("")
-  sourceType      String   @default("unknown")
+  publisher       String?
   audioURL        String?
   durationSeconds Int?
-  thumbnailURL    String?
-  publisher       String?
-  resolveStatus   String   @default("pending")
-  resolveError    String?
-  // How the client should play this item:
-  //   direct   — stream audioURL as-is (podcast CDNs, HLS)
-  //   proxy    — stream via GET /api/stream/:id (expiring/IP-locked URLs, e.g. yt-dlp)
-  //   external — no in-app audio; open originalURL in the source app
-  playbackType    String   @default("direct")
   isListened      Boolean  @default(false)
   position        Int      @default(0)
   savedAt         DateTime @default(now())

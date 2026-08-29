@@ -12,11 +12,8 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 
-# Install yt-dlp standalone binary (no Python required)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg && \
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
-         -o /usr/local/bin/yt-dlp && \
-    chmod +x /usr/local/bin/yt-dlp && \
+# curl is only needed for the container health check
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./

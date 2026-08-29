@@ -6,21 +6,13 @@ enum APIError: Error {
     case noData
 }
 
-/// Backend location, shared by APIClient (JSON API) and AudioEngine (stream proxy URLs).
+/// Backend location. Point the app at a local server with the
+/// AUDIO_QUEUE_BACKEND_URL scheme environment variable.
 enum BackendConfig {
     static let baseURL: String = {
         ProcessInfo.processInfo.environment["AUDIO_QUEUE_BACKEND_URL"]
             ?? "https://audio-queue-production.up.railway.app"
     }()
-
-    /// Streaming URL for a proxy-playback item. AVPlayer performs its own
-    /// (Range) requests, so authentication travels as a query token.
-    static func streamURL(forItemId id: String) -> URL? {
-        guard let token = KeychainService.loadToken(),
-              var components = URLComponents(string: "\(baseURL)/api/stream/\(id)") else { return nil }
-        components.queryItems = [URLQueryItem(name: "token", value: token)]
-        return components.url
-    }
 }
 
 actor APIClient {
@@ -46,25 +38,29 @@ actor APIClient {
 
     // MARK: - Auth
 
-    struct SignInResponse: Decodable {
-        struct UserInfo: Decodable {
-            let id: String
-            let email: String?
-        }
+    struct SessionResponse: Decodable {
         let token: String
-        let user: UserInfo
+        let user: AccountInfo
     }
 
-    func signInWithApple(identityToken: String) async throws -> SignInResponse {
-        var req = try buildRequest(path: "/api/auth/apple", method: "POST", auth: false)
+    /// Anonymous session for this install — no sign-in required.
+    func signInWithDevice(deviceId: String) async throws -> SessionResponse {
+        var req = try buildRequest(path: "/api/auth/device", method: "POST", auth: false)
+        req.httpBody = try JSONEncoder().encode(["deviceId": deviceId])
+        return try await perform(req)
+    }
+
+    /// Signs in to sync. Sends the current session so the backend can carry
+    /// an anonymous queue over to the Apple account.
+    func signInWithApple(identityToken: String) async throws -> SessionResponse {
+        var req = try buildRequest(path: "/api/auth/apple", method: "POST")
         req.httpBody = try JSONEncoder().encode(["identityToken": identityToken])
         return try await perform(req)
     }
 
-    func validateToken() async throws {
+    func fetchAccount() async throws -> AccountInfo {
         let req = try buildRequest(path: "/api/auth/me", method: "GET")
-        let (_, response) = try await URLSession.shared.data(for: req)
-        try checkStatus(response)
+        return try await perform(req)
     }
 
     /// Permanently deletes the account and all server-side data.
@@ -93,15 +89,9 @@ actor APIClient {
         try checkStatus(response)
     }
 
-    func markListened(id: String) async throws -> QueueItem {
+    func setListened(id: String, isListened: Bool) async throws -> QueueItem {
         var req = try buildRequest(path: "/api/queue/\(id)", method: "PATCH")
-        req.httpBody = try JSONEncoder().encode(["isListened": true])
-        return try await perform(req)
-    }
-
-    func markUnlistened(id: String) async throws -> QueueItem {
-        var req = try buildRequest(path: "/api/queue/\(id)", method: "PATCH")
-        req.httpBody = try JSONEncoder().encode(["isListened": false])
+        req.httpBody = try JSONEncoder().encode(["isListened": isListened])
         return try await perform(req)
     }
 
@@ -125,7 +115,7 @@ actor APIClient {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 35
+        req.timeoutInterval = 30
         if auth {
             if let token = KeychainService.loadToken() {
                 req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

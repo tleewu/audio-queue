@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { dispatch } from '../resolvers/resolver';
+import { resolve, ResolvedItem } from '../resolvers/podcast';
 import { assertPublicHttpUrl } from '../utils/urlGuard';
 
 const router = Router();
 
 const MAX_QUEUE_ITEMS = 500;
 
-// GET /api/queue — fetch user's items ordered by position
+// GET /api/queue — the user's items in queue order
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   const items = await prisma.queueItem.findMany({
     where: { userId: req.userId! },
@@ -16,16 +16,17 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   res.json(items);
 });
 
-// POST /api/queue — insert pending item, fire-and-forget resolve
+// POST /api/queue — resolve the link, then save it
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url?: string };
   if (!url || typeof url !== 'string' || url.length > 2048) {
     res.status(400).json({ error: 'url required' });
     return;
   }
+  const trimmed = url.trim();
 
   try {
-    await assertPublicHttpUrl(url.trim());
+    await assertPublicHttpUrl(trimmed);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
     return;
@@ -42,45 +43,37 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     orderBy: { position: 'desc' },
     select: { position: true },
   });
-  const position = (last?.position ?? -1) + 1;
+
+  // Resolution never throws away the link: anything that isn't a podcast
+  // episode is saved as a web item and opened in a web view.
+  const resolved: ResolvedItem = await resolve(trimmed).catch((err: unknown) => {
+    console.error(`Resolution failed for ${trimmed}:`, (err as Error).message);
+    return { title: trimmed };
+  });
 
   const item = await prisma.queueItem.create({
     data: {
       userId: req.userId!,
-      originalURL: url.trim(),
-      title: url.trim(),
-      position,
-      resolveStatus: 'pending',
+      originalURL: trimmed,
+      title: resolved.title || trimmed,
+      publisher: resolved.publisher ?? null,
+      audioURL: resolved.audioURL ?? null,
+      durationSeconds: resolved.durationSeconds ?? null,
+      position: (last?.position ?? -1) + 1,
     },
   });
 
-  resolveInBackground(item.id, url.trim());
   res.status(201).json(item);
-});
-
-// DELETE /api/queue/:id
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const item = await prisma.queueItem.findFirst({
-    where: { id, userId: req.userId! },
-  });
-  if (!item) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  await prisma.queueItem.delete({ where: { id } });
-  res.status(204).send();
 });
 
 // PATCH /api/queue/reorder — bulk position update
 router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
-  const { order } = req.body as { order?: Array<{ id: string; position: number | string }> };
+  const { order } = req.body as { order?: Array<{ id: string; position: number }> };
   if (!Array.isArray(order) || order.length > 1000) {
     res.status(400).json({ error: 'order array required' });
     return;
   }
 
-  // Older clients send position as a string — coerce and validate
   const updates: Array<{ id: string; position: number }> = [];
   for (const entry of order) {
     const position = Number(entry?.position);
@@ -102,13 +95,11 @@ router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
   res.json({ ok: true });
 });
 
-// PATCH /api/queue/:id — update isListened
+// PATCH /api/queue/:id — archive / unarchive
 router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
   const { isListened } = req.body as { isListened?: boolean };
-
   const item = await prisma.queueItem.findFirst({
-    where: { id, userId: req.userId! },
+    where: { id: req.params.id, userId: req.userId! },
   });
   if (!item) {
     res.status(404).json({ error: 'Not found' });
@@ -116,46 +107,23 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 
   const updated = await prisma.queueItem.update({
-    where: { id },
+    where: { id: item.id },
     data: { isListened: isListened ?? item.isListened },
   });
   res.json(updated);
 });
 
-// Background resolution helper
-async function resolveInBackground(itemId: string, url: string): Promise<void> {
-  try {
-    const resolved = await dispatch(url);
-    // 'external' items intentionally have no audioURL (open in the source app) —
-    // resolved as long as we know where to send the user; only 'unsupported' fails.
-    const isExternal = resolved.playbackType === 'external' && resolved.sourceType !== 'unsupported';
-    const ok = !!resolved.audioURL || isExternal;
-    // updateMany is a no-op when the item was deleted before resolution finished
-    await prisma.queueItem.updateMany({
-      where: { id: itemId },
-      data: {
-        title: resolved.title || url,
-        sourceType: resolved.sourceType,
-        playbackType: resolved.playbackType,
-        audioURL: resolved.audioURL ?? null,
-        durationSeconds: resolved.durationSeconds ?? null,
-        thumbnailURL: resolved.thumbnailURL ?? null,
-        publisher: resolved.publisher ?? null,
-        resolveStatus: ok ? 'resolved' : 'failed',
-        resolveError: ok ? null : 'No audio stream found',
-      },
-    });
-  } catch (err) {
-    console.error(`Resolution failed for ${itemId}:`, err);
-    await prisma.queueItem.updateMany({
-      where: { id: itemId },
-      data: {
-        resolveStatus: 'failed',
-        resolveError: (err as Error).message,
-      },
-    }).catch(() => {});
+// DELETE /api/queue/:id
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  const item = await prisma.queueItem.findFirst({
+    where: { id: req.params.id, userId: req.userId! },
+  });
+  if (!item) {
+    res.status(404).json({ error: 'Not found' });
+    return;
   }
-}
+  await prisma.queueItem.delete({ where: { id: item.id } });
+  res.status(204).send();
+});
 
-export { resolveInBackground };
 export default router;

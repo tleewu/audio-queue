@@ -18,27 +18,12 @@ class ShareViewController: UIViewController {
         return v
     }()
 
-    private let iconCircle: UIView = {
-        let v = UIView()
-        v.backgroundColor = UIColor.systemBlue
-        v.layer.cornerRadius = 32
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-
-    private let checkmark: UIImageView = {
-        let config = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
-        let iv = UIImageView(image: UIImage(systemName: "checkmark", withConfiguration: config))
-        iv.tintColor = .white
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.text = "Added to cue"
         l.font = .systemFont(ofSize: 20, weight: .semibold)
         l.textColor = .white
+        l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -81,8 +66,6 @@ class ShareViewController: UIViewController {
 
     private func setupUI() {
         view.addSubview(containerView)
-        containerView.addSubview(iconCircle)
-        iconCircle.addSubview(checkmark)
         containerView.addSubview(titleLabel)
         view.addSubview(dismissLabel)
 
@@ -92,16 +75,9 @@ class ShareViewController: UIViewController {
             containerView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.75),
             containerView.heightAnchor.constraint(equalToConstant: 80),
 
-            iconCircle.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            iconCircle.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            iconCircle.widthAnchor.constraint(equalToConstant: 48),
-            iconCircle.heightAnchor.constraint(equalToConstant: 48),
-
-            checkmark.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            checkmark.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-
-            titleLabel.leadingAnchor.constraint(equalTo: iconCircle.trailingAnchor, constant: 14),
+            titleLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: containerView.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -16),
 
             dismissLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),

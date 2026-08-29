@@ -43,27 +43,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 }
 
 /**
- * Like requireAuth, but also accepts `?token=<jwt>` — AVPlayer streams media
- * with its own URL loading system, and query-string auth is the only channel
- * guaranteed to survive every request it makes (including range retries).
+ * Sets req.userId when a valid token is present, but never rejects. Used by
+ * the Apple sign-in route so it can tell whether the caller already has an
+ * anonymous account whose queue should carry over.
  */
-export function requireAuthAllowQueryToken(req: Request, res: Response, next: NextFunction): void {
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
-  if (header?.startsWith('Bearer ')) {
-    return requireAuth(req, res, next);
+  if (header?.startsWith('Bearer ') && process.env.JWT_SECRET) {
+    const userId = verifyToken(header.slice(7));
+    if (userId) req.userId = userId;
   }
-
-  if (!process.env.JWT_SECRET) {
-    res.status(500).json({ error: 'Server misconfigured' });
-    return;
-  }
-
-  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
-  const userId = queryToken ? verifyToken(queryToken) : null;
-  if (!userId) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-  req.userId = userId;
   next();
 }

@@ -1,21 +1,50 @@
-import Foundation
 import AuthenticationServices
+import Foundation
 
+/// Who the queue belongs to. Anonymous until the user signs in to sync.
+struct AccountInfo: Decodable, Equatable {
+    let id: String
+    let email: String?
+    let isSignedIn: Bool
+}
+
+/// Sessions start anonymously from a device id kept in the keychain. Signing in
+/// with Apple upgrades that same account, so nothing saved before is lost.
 @MainActor
 final class AuthService: ObservableObject {
     static let shared = AuthService()
 
-    @Published var isAuthenticated: Bool
+    @Published private(set) var account: AccountInfo?
 
-    private init() {
-        isAuthenticated = KeychainService.loadToken() != nil
-        checkCredentialState()
-        if isAuthenticated {
-            validateToken()
+    var isSignedIn: Bool { account?.isSignedIn ?? false }
+
+    private init() {}
+
+    /// Makes sure there is a usable session. Safe to call repeatedly.
+    func start() async {
+        guard account == nil else { return }
+
+        if KeychainService.loadToken() != nil {
+            do {
+                account = try await APIClient.shared.fetchAccount()
+                return
+            } catch APIError.unauthorized {
+                KeychainService.deleteToken() // expired or deleted account
+            } catch {
+                return // offline — keep the token and try again later
+            }
+        }
+
+        do {
+            let session = try await APIClient.shared.signInWithDevice(deviceId: KeychainService.deviceId())
+            KeychainService.saveToken(session.token)
+            account = session.user
+        } catch {
+            print("device sign-in failed:", error)
         }
     }
 
-    // MARK: - Sign In with Apple
+    // MARK: - Sign in with Apple
 
     func signInWithApple(credential: ASAuthorizationAppleIDCredential) async throws {
         guard
@@ -23,49 +52,21 @@ final class AuthService: ObservableObject {
             let identityToken = String(data: tokenData, encoding: .utf8)
         else { throw URLError(.badServerResponse) }
 
-        let response = try await APIClient.shared.signInWithApple(identityToken: identityToken)
-        KeychainService.saveToken(response.token)
-        isAuthenticated = true
+        let session = try await APIClient.shared.signInWithApple(identityToken: identityToken)
+        KeychainService.saveToken(session.token)
+        account = session.user
     }
 
+    /// Drops the synced session and falls back to this device's own account.
     func signOut() {
         KeychainService.deleteToken()
-        isAuthenticated = false
+        account = nil
+        Task { await start() }
     }
 
-    /// Permanently deletes the account server-side, then signs out locally.
+    /// Permanently deletes the account server-side, then starts a fresh one.
     func deleteAccount() async throws {
         try await APIClient.shared.deleteAccount()
         signOut()
-    }
-
-    // MARK: - Credential state check
-
-    private func checkCredentialState() {
-        guard let userID = storedAppleUserID() else { return }
-        let provider = ASAuthorizationAppleIDProvider()
-        provider.getCredentialState(forUserID: userID) { [weak self] state, _ in
-            if state == .revoked || state == .notFound {
-                Task { @MainActor in self?.signOut() }
-            }
-        }
-    }
-
-    private func validateToken() {
-        Task {
-            do {
-                try await APIClient.shared.validateToken()
-            } catch APIError.unauthorized {
-                signOut()
-            } catch {
-                // Network error — don't sign out, let normal API calls handle it
-            }
-        }
-    }
-
-    private func storedAppleUserID() -> String? {
-        // We don't persist the Apple user ID separately; rely on JWT validity.
-        // This is a best-effort revocation check — JWT expiry is the hard gate.
-        return nil
     }
 }
