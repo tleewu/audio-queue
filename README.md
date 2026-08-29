@@ -36,15 +36,16 @@ npm test           # vitest
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string |
 | `JWT_SECRET` | yes | signs session tokens (90-day expiry) |
-| `IOS_BUNDLE_ID` | yes | audience check for Sign in with Apple token verification |
+| `IOS_BUNDLE_ID` | yes | audience check for Sign in with Apple token verification (only needed once someone signs in to sync) |
 | `LISTEN_NOTES_API_KEY` | yes, in practice | [Listen Notes](https://www.listennotes.com/api/) episode search — without it every link becomes a web item |
 | `SUPPORT_EMAIL` | optional | shown on /privacy, /support, /terms pages |
 | `PORT` | no | defaults to 8080 |
 
 ### API
 
-- `POST /api/auth/apple` — Sign in with Apple → JWT
-- `GET /api/auth/me` — token validation
+- `POST /api/auth/device` — anonymous account for a device-generated id → JWT. Every install starts here.
+- `POST /api/auth/apple` — Sign in with Apple to sync. Sent with the caller's anonymous session, that account is upgraded in place; if an Apple account already exists, the anonymous queue is merged into it.
+- `GET /api/auth/me` — validates the token and reports whether the session syncs
 - `DELETE /api/auth/account` — permanent account + data deletion (App Store 5.1.1(v))
 - `GET/POST/PATCH/DELETE /api/queue…` — queue CRUD (auth required). `POST` resolves the link before replying, so the item comes back final.
 - `GET /privacy`, `/support`, `/terms` — static pages for the App Store listing
@@ -61,7 +62,9 @@ Xcode project in `iOS/` (generated with XcodeGen from `project.yml`; the checked
 - `ShareExtension/` — "Add to cue" share sheet target; hands URLs to the app via the App Group.
 - `AudioQueueTests/` — unit tests.
 
-The interface is text only — no artwork, thumbnails or episode images anywhere. One screen holds the header, the queue, and a player bar that opens the full-screen player; `AudioEngine` owns the AVPlayer, the play order, and position memory.
+The interface is text only — no artwork, thumbnails or episode images anywhere. One screen holds the header (profile on the left, add on the right), the queue, and a player bar that opens the full-screen player; `AudioEngine` owns the AVPlayer, the play order, and position memory.
+
+There is no sign-in wall. The app registers a keychain-stored device id on first launch and works immediately; signing in with Apple from the profile is optional and only buys cross-device sync, carrying the existing queue over. The profile also holds the archive (items marked listened), the legal pages, and account deletion.
 
 Point the app at a local backend with the `AUDIO_QUEUE_BACKEND_URL` scheme environment variable.
 

@@ -61,7 +61,6 @@ struct PlayerBar: View {
 
 /// Full-screen player. Text plus transport controls — no artwork.
 struct PlayerView: View {
-    @ObservedObject var queueVM: QueueViewModel
     @ObservedObject private var engine = AudioEngine.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -98,10 +97,7 @@ struct PlayerView: View {
 
             speedPicker
                 .padding(.top, 28)
-
-            actions
-                .padding(.top, 24)
-                .padding(.bottom, 32)
+                .padding(.bottom, 48)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemBackground))
@@ -190,30 +186,5 @@ struct PlayerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(Capsule().fill(Color.secondary.opacity(0.08)))
-    }
-
-    private var actions: some View {
-        HStack(spacing: 28) {
-            Button("Archive") {
-                guard let item else { return }
-                queueVM.setListened(item, true)
-                dismiss()
-            }
-
-            if let item, let url = item.webURL {
-                ShareLink(item: url, subject: Text(item.title)) {
-                    Text("Share")
-                }
-            }
-
-            Button("Remove", role: .destructive) {
-                guard let item else { return }
-                queueVM.delete(item)
-                engine.stop()
-                dismiss()
-            }
-        }
-        .font(.subheadline)
-        .disabled(item == nil)
     }
 }

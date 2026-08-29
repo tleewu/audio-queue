@@ -8,9 +8,13 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
+/// Everyone starts as an anonymous device account. Signing in with Apple
+/// attaches `appleUserId` to that same row (or merges it into the existing
+/// Apple account), so the queue survives the upgrade.
 model User {
   id          String      @id @default(cuid())
-  appleUserId String      @unique
+  deviceId    String?     @unique
+  appleUserId String?     @unique
   email       String?
   createdAt   DateTime    @default(now())
   queueItems  QueueItem[]

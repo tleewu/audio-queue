@@ -41,3 +41,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   req.userId = userId;
   next();
 }
+
+/**
+ * Sets req.userId when a valid token is present, but never rejects. Used by
+ * the Apple sign-in route so it can tell whether the caller already has an
+ * anonymous account whose queue should carry over.
+ */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ') && process.env.JWT_SECRET) {
+    const userId = verifyToken(header.slice(7));
+    if (userId) req.userId = userId;
+  }
+  next();
+}

@@ -1,25 +1,16 @@
 import SwiftUI
 
-enum QueueTab: String, CaseIterable {
-    case queue = "Queue"
-    case archive = "Archive"
-}
-
 /// The one screen: header, the queue, and the player bar.
 struct ContentView: View {
     @StateObject private var queueVM = QueueViewModel()
     @ObservedObject private var engine = AudioEngine.shared
+    @ObservedObject private var authService = AuthService.shared
 
-    @State private var tab: QueueTab = .queue
     @State private var isReordering = false
     @State private var showAddURL = false
-    @State private var showSettings = false
+    @State private var showProfile = false
     @State private var showPlayer = false
     @State private var webItem: QueueItem?
-
-    private var displayedItems: [QueueItem] {
-        tab == .queue ? queueVM.queue : queueVM.archive
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,8 +30,8 @@ struct ContentView: View {
                 Task { await queueVM.add(urlString) }
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(authService: AuthService.shared)
+        .sheet(isPresented: $showProfile) {
+            ProfileView(authService: authService, queueVM: queueVM)
         }
         .sheet(item: $webItem) { item in
             if let url = item.webURL {
@@ -49,9 +40,12 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $showPlayer) {
-            PlayerView(queueVM: queueVM)
+            PlayerView()
         }
-        .task { await refresh() }
+        .task {
+            await authService.start()
+            await refresh()
+        }
         .onReceive(
             NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
         ) { _ in
@@ -78,16 +72,13 @@ struct ContentView: View {
                 .fontWeight(.semibold)
             } else {
                 Button {
-                    showSettings = true
+                    showProfile = true
                 } label: {
-                    Image(systemName: "gearshape")
-                        .font(.headline)
+                    Image(systemName: "person.crop.circle")
+                        .font(.title3)
                         .foregroundStyle(.secondary)
                 }
 
-                Spacer()
-                tabToggleButton(tab: .queue, icon: "list.bullet")
-                tabToggleButton(tab: .archive, icon: "checkmark.square")
                 Spacer()
 
                 Button {
@@ -101,54 +92,23 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 4)
-        .onChange(of: tab) { _, _ in isReordering = false }
-    }
-
-    private func tabToggleButton(tab target: QueueTab, icon: String) -> some View {
-        let isSelected = tab == target
-        return Button {
-            withAnimation(.easeInOut(duration: 0.25)) { tab = target }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                if isSelected {
-                    Text(target.rawValue)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.8, anchor: .leading)),
-                            removal: .opacity.combined(with: .scale(scale: 0.8, anchor: .leading))
-                        ))
-                }
-            }
-            .padding(.horizontal, isSelected ? 14 : 10)
-            .padding(.vertical, 8)
-            .background {
-                if isSelected {
-                    Capsule().fill(Color.accentColor.opacity(0.25))
-                }
-            }
-            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - List
 
     private var list: some View {
         List {
-            if queueVM.addingCount > 0 && tab == .queue {
+            if queueVM.addingCount > 0 {
                 Text(queueVM.addingCount == 1 ? "Adding link…" : "Adding \(queueVM.addingCount) links…")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            if displayedItems.isEmpty {
+            if queueVM.queue.isEmpty {
                 emptyState
                     .listRowSeparator(.hidden)
             } else {
-                ForEach(displayedItems) { item in
+                ForEach(queueVM.queue) { item in
                     QueueRowView(
                         item: item,
                         isCurrent: engine.currentItem?.id == item.id,
@@ -160,7 +120,7 @@ struct ContentView: View {
                     .onTapGesture { open(item) }
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.5).onEnded { _ in
-                            if tab == .queue { withAnimation { isReordering = true } }
+                            withAnimation { isReordering = true }
                         }
                     )
                     .swipeActions(edge: .trailing) {
@@ -171,11 +131,11 @@ struct ContentView: View {
                         }
 
                         Button {
-                            queueVM.setListened(item, !item.isListened)
+                            queueVM.setListened(item, true)
                         } label: {
-                            Text(item.isListened ? "Unarchive" : "Archive")
+                            Text("Archive")
                         }
-                        .tint(item.isListened ? .blue : .green)
+                        .tint(.green)
                     }
                 }
                 .onMove { source, destination in
@@ -189,12 +149,10 @@ struct ContentView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(tab == .queue ? "Your queue is empty" : "Nothing archived yet")
+            Text("Your queue is empty")
                 .font(.title3)
                 .fontWeight(.medium)
-            Text(tab == .queue
-                 ? "Share a link to cue. Podcast episodes play here; everything else opens in a web view."
-                 : "Items you archive show up here.")
+            Text("Share a link to cue. Podcast episodes play here; everything else opens in a web view.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
