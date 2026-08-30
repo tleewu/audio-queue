@@ -16,14 +16,16 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             list
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .bottom) {
+            // A real sibling rather than a safeAreaInset. The inset form has to
+            // re-measure when its conditional content appears and when the list
+            // grows, and a stale measurement leaves the bar stranded mid-screen.
+            // As the last element of the stack it is always at the bottom.
             if engine.currentItem != nil {
                 PlayerBar { showPlayer = true }
                     .transition(.move(edge: .bottom))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(.easeInOut(duration: 0.2), value: engine.currentItem?.id)
         .sheet(isPresented: $showAddURL) {
             AddURLView { urlString in
@@ -126,19 +128,25 @@ struct ContentView: View {
                             withAnimation { isReordering = true }
                         }
                     )
+                    // First button is what a full swipe triggers, so Archive
+                    // leads: a stray swipe should file something away, never
+                    // destroy it. Both carry explicit tints — a destructive
+                    // button would otherwise inherit the app's monochrome
+                    // .primary tint and render white-on-white in dark mode.
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            queueVM.delete(item)
-                        } label: {
-                            Text("Delete")
-                        }
-
                         Button {
                             queueVM.setListened(item, true)
                         } label: {
-                            Text("Archive")
+                            Label("Archive", systemImage: "archivebox.fill")
                         }
-                        .tint(.secondary)
+                        .tint(.gray)
+
+                        Button(role: .destructive) {
+                            queueVM.delete(item)
+                        } label: {
+                            Label("Delete", systemImage: "trash.fill")
+                        }
+                        .tint(.red)
                     }
                 }
                 .onMove { source, destination in

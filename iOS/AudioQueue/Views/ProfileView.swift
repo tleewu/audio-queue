@@ -211,19 +211,22 @@ struct ArchiveView: View {
                             webItem = item
                         }
                     }
+                    // Unarchive leads so a full swipe restores rather than
+                    // destroys; explicit tints keep both readable in dark mode.
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            queueVM.delete(item)
-                        } label: {
-                            Text("Delete")
-                        }
-
                         Button {
                             queueVM.setListened(item, false)
                         } label: {
-                            Text("Unarchive")
+                            Label("Unarchive", systemImage: "tray.and.arrow.up.fill")
                         }
-                        .tint(.secondary)
+                        .tint(.gray)
+
+                        Button(role: .destructive) {
+                            queueVM.delete(item)
+                        } label: {
+                            Label("Delete", systemImage: "trash.fill")
+                        }
+                        .tint(.red)
                     }
                 }
             }
