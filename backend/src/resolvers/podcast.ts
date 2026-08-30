@@ -57,7 +57,12 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
       { headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,*/*' } },
       PAGE_TIMEOUT_MS,
     );
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      // Silent until now, and the actual failure in production: YouTube answers
+      // datacenter IPs with 429/403 where a laptop gets the page.
+      console.warn(`Page fetch for ${url} returned HTTP ${resp.status} ${resp.statusText}`);
+      return null;
+    }
     // Everything we parse lives in <head>, so cut on the head boundary rather
     // than a flat byte count: YouTube's <head> alone runs past 700 KB, and a
     // fixed cap sliced og:title off the end and left the item titled by its URL.
