@@ -30,6 +30,7 @@ model QueueItem {
   title           String   @default("")
   publisher       String?
   audioURL        String?
+  imageURL        String?
   durationSeconds Int?
   isListened      Boolean  @default(false)
   position        Int      @default(0)
