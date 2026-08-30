@@ -79,6 +79,9 @@ final class QueueViewModel: ObservableObject {
 
     func delete(_ item: QueueItem) {
         items.removeAll { $0.id == item.id }
+        // The footer holds on to the last thing played; drop it when that very
+        // item is deleted, rather than leaving a row that no longer exists.
+        AudioEngine.shared.forget(item.id)
         Task {
             do {
                 try await APIClient.shared.deleteFromQueue(id: item.id)

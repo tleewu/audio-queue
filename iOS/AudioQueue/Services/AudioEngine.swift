@@ -39,6 +39,8 @@ final class AudioEngine: ObservableObject {
     private var artworkTask: Task<Void, Never>?
 
     private static let positionKey = "playbackPositions"
+    /// The footer stays on the last thing played, across launches.
+    private static let lastItemKey = "lastPlayedItem"
 
     private init() {
         player.automaticallyWaitsToMinimizeStalling = false
@@ -46,6 +48,7 @@ final class AudioEngine: ObservableObject {
         setupRemoteCommands()
         setupTimeObserver()
         setupItemEndObserver()
+        restoreLastPlayed()
     }
 
     // MARK: - Playback
@@ -57,6 +60,7 @@ final class AudioEngine: ObservableObject {
         savePositionNow()
         self.upNext = upNext
         currentItem = item
+        rememberLastPlayed(item)
         duration = Double(item.durationSeconds ?? 0)
         isPlaying = true
         lastPositionSave = Date()
@@ -111,9 +115,11 @@ final class AudioEngine: ObservableObject {
         updateNowPlaying()
     }
 
-    /// Stops playback and dismisses the player bar.
+    /// Stops playback and dismisses the player bar entirely. Only for when the
+    /// item is gone — ordinary end-of-queue keeps the footer, see finish().
     func stop() {
         savePositionNow()
+        UserDefaults.standard.removeObject(forKey: Self.lastItemKey)
         player.replaceCurrentItem(with: nil)
         upNext = []
         currentItem = nil
@@ -215,11 +221,49 @@ final class AudioEngine: ObservableObject {
         currentTime = 0
 
         guard !upNext.isEmpty else {
-            stop()
+            finish()
             return
         }
         let next = upNext.removeFirst()
         play(next, upNext: upNext)
+    }
+
+    /// Playback ran out with nothing queued behind it. Come to rest at the
+    /// start but keep currentItem, so the footer still offers the last thing
+    /// played instead of vanishing.
+    private func finish() {
+        player.replaceCurrentItem(with: nil)
+        upNext = []
+        currentTime = 0
+        isPlaying = false
+        updateNowPlaying()
+    }
+
+    /// Drops the footer when the item behind it leaves the queue.
+    func forget(_ itemId: String) {
+        guard currentItem?.id == itemId else { return }
+        stop()
+    }
+
+    // MARK: - Last Played
+
+    private func rememberLastPlayed(_ item: QueueItem) {
+        guard let data = try? JSONEncoder().encode(item) else { return }
+        UserDefaults.standard.set(data, forKey: Self.lastItemKey)
+    }
+
+    /// Restores the footer on launch, paused at wherever it was left. Now
+    /// Playing is deliberately not published here — nothing is loaded yet, so
+    /// the lock screen should stay empty until the user actually starts it.
+    private func restoreLastPlayed() {
+        guard
+            let data = UserDefaults.standard.data(forKey: Self.lastItemKey),
+            let item = try? JSONDecoder().decode(QueueItem.self, from: data)
+        else { return }
+        currentItem = item
+        duration = Double(item.durationSeconds ?? 0)
+        currentTime = savedPosition(for: item.id) ?? 0
+        isPlaying = false
     }
 
     // MARK: - Now Playing
