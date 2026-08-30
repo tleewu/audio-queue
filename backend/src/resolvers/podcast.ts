@@ -21,7 +21,8 @@ export interface ResolvedItem {
 const USER_AGENT = 'Mozilla/5.0 (compatible; CueApp/1.0)';
 const PAGE_TIMEOUT_MS = 6_000;
 const SEARCH_TIMEOUT_MS = 8_000;
-const MAX_HTML_BYTES = 400_000;
+/** Fallback cap for pages that never close <head>. */
+const MAX_HTML_BYTES = 2_000_000;
 /** Minimum share of significant words an episode title must have in common. */
 const MIN_TITLE_MATCH = 0.5;
 
@@ -57,7 +58,12 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
       PAGE_TIMEOUT_MS,
     );
     if (!resp.ok) return null;
-    html = (await resp.text()).slice(0, MAX_HTML_BYTES);
+    // Everything we parse lives in <head>, so cut on the head boundary rather
+    // than a flat byte count: YouTube's <head> alone runs past 700 KB, and a
+    // fixed cap sliced og:title off the end and left the item titled by its URL.
+    const text = await resp.text();
+    const headEnd = text.indexOf('</head>');
+    html = headEnd > -1 ? text.slice(0, headEnd + 7) : text.slice(0, MAX_HTML_BYTES);
   } catch (err) {
     console.warn(`Page fetch failed for ${url}:`, (err as Error).message);
     return null;

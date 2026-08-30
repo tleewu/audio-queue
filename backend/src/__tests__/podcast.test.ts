@@ -121,6 +121,25 @@ describe('resolve', () => {
     vi.unstubAllGlobals();
   });
 
+  // Regression: the old flat 400 KB cap sliced YouTube's <head> in half, so
+  // og:title was never parsed and the item ended up titled by its raw URL.
+  it('reads metadata out of a <head> far larger than a fixed byte cap', async () => {
+    const filler = '<script>/*'.padEnd(900_000, 'x') + '*/</script>';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        htmlResponse(`<html><head>${filler}
+            <meta property="og:title" content="Never Gonna Give You Up - YouTube">
+            <link itemprop="name" content="Rick Astley">
+          </head><body>${'y'.repeat(500_000)}</body></html>`),
+      ),
+    );
+
+    const item = await resolve('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    expect(item.title).toBe('Never Gonna Give You Up');
+    expect(item.publisher).toBe('Rick Astley');
+  });
+
   it('resolves a page whose title matches a Listen Notes episode', async () => {
     process.env.LISTEN_NOTES_API_KEY = KEY;
     vi.stubGlobal(
