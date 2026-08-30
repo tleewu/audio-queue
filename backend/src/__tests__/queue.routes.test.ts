@@ -94,6 +94,7 @@ describe('Queue routes', () => {
         title: 'Episode 42',
         publisher: 'The Show',
         audioURL: 'https://cdn.example.com/ep.mp3',
+        imageURL: 'https://cdn.example.com/art600.jpg',
         durationSeconds: 1800,
       });
       vi.mocked(prisma.queueItem.create).mockResolvedValue({ id: 'new-1' } as any);
@@ -112,6 +113,7 @@ describe('Queue routes', () => {
           title: 'Episode 42',
           publisher: 'The Show',
           audioURL: 'https://cdn.example.com/ep.mp3',
+          imageURL: 'https://cdn.example.com/art600.jpg',
           durationSeconds: 1800,
           position: 0,
         },

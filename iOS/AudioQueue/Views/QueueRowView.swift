@@ -10,6 +10,8 @@ struct QueueRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+            ArtworkView(url: item.artworkURL, size: 56)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(.subheadline)

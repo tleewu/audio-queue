@@ -19,13 +19,15 @@ const KEY = 'test-listen-notes-key';
 const html = (body: string) => ({ ok: true, text: async () => body }) as unknown as Response;
 const json = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 
-const oembed = (title: string, channel: string) => json({ title, author_name: channel });
+const oembed = (title: string, channel: string, thumb = 'https://i.ytimg.com/vi/x/hqdefault.jpg') =>
+  json({ title, author_name: channel, thumbnail_url: thumb });
 
 const lnResults = (...episodes: unknown[]) => json({ results: episodes });
 
 const lnEpisode = (title: string, podcast: string, audio = `https://cdn.example.com/${encodeURIComponent(title)}.mp3`) => ({
   audio,
   audio_length_sec: 3600,
+  image: `https://cdn.example.com/art/${encodeURIComponent(title)}.jpg`,
   title_original: title,
   podcast: { title_original: podcast },
 });
@@ -62,6 +64,8 @@ describe('YouTube', () => {
     expect(item.audioURL).toBeTruthy();
     expect(item.title).toBe('#499 – Gary Gallagher: American Civil War, Slavery, Lincoln');
     expect(item.publisher).toBe('Lex Fridman Podcast');
+    // the episode's own artwork beats the video thumbnail
+    expect(item.imageURL).toContain('cdn.example.com/art/');
   });
 
   it('TN: a clip from a podcast channel stays a web item — no episode exists for it', async () => {
@@ -78,6 +82,8 @@ describe('YouTube', () => {
 
     expect(item.audioURL).toBeUndefined();
     expect(item.title).toBe('David Friedberg: Government Spending Ruins Everything it Touches');
+    // still artwork: a web item falls back to the page thumbnail
+    expect(item.imageURL).toBe('https://i.ytimg.com/vi/x/hqdefault.jpg');
   });
 
   it('TN: a lecture with a short generic title cannot grab audio from an unrelated show', async () => {
@@ -131,6 +137,8 @@ describe('Apple Podcasts', () => {
             collectionName: 'Lex Fridman Podcast',
             episodeUrl: 'https://media.example.com/lex_501.mp3',
             trackTimeMillis: 19317000,
+            artworkUrl600: 'https://is1-ssl.mzstatic.com/image/600x600bb.jpg',
+            artworkUrl160: 'https://is1-ssl.mzstatic.com/image/160x160bb.jpg',
           },
         ],
       }),
@@ -145,6 +153,7 @@ describe('Apple Podcasts', () => {
     expect(item.title).toBe('#501 – DHH: Future of Programming, AI, Agentic Engineering, Vibe Coding & Linux');
     expect(item.publisher).toBe('Lex Fridman Podcast');
     expect(item.durationSeconds).toBe(19317);
+    expect(item.imageURL).toBe('https://is1-ssl.mzstatic.com/image/600x600bb.jpg');
     // the platform asserted the match; the episode search must not run
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain('itunes.apple.com/lookup');
@@ -209,6 +218,7 @@ describe('Spotify', () => {
         '<html><head>' +
           '<meta property="og:title" content="Never Gonna Give You Up">' +
           '<meta property="og:description" content="Rick Astley · Whenever You Need Somebody · Song · 1987">' +
+          '<meta property="og:image" content="https://image-cdn-ak.spotifycdn.com/image/cover">' +
           '<meta property="og:site_name" content="Spotify">' +
           '<meta property="og:type" content="music.song">' +
           '</head></html>',
@@ -220,6 +230,8 @@ describe('Spotify', () => {
 
     expect(item.audioURL).toBeUndefined();
     expect(item.title).toBe('Never Gonna Give You Up');
+    // a web item, but not a barren one
+    expect(item.imageURL).toBe('https://image-cdn-ak.spotifycdn.com/image/cover');
     // one fetch only: the page. No Listen Notes call for a song.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

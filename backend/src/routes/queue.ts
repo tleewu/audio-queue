@@ -65,6 +65,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response): Promise<void>
       title: resolved.title || trimmed,
       publisher: resolved.publisher ?? null,
       audioURL: resolved.audioURL ?? null,
+      imageURL: resolved.imageURL ?? null,
       durationSeconds: resolved.durationSeconds ?? null,
       position: (last?.position ?? -1) + 1,
     },

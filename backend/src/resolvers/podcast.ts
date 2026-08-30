@@ -15,6 +15,7 @@ export interface ResolvedItem {
   title: string;
   publisher?: string;
   audioURL?: string;
+  imageURL?: string;
   durationSeconds?: number;
 }
 
@@ -45,13 +46,14 @@ export async function resolve(url: string): Promise<ResolvedItem> {
   // index for one can only produce false positives. Classified by URL shape,
   // not og:type — Spotify labels its podcast episodes "music.song" too.
   if (isMusicUrl(url)) {
-    return { title: page.title, publisher: page.show ?? page.site };
+    return { title: page.title, publisher: page.show ?? page.site, imageURL: page.image };
   }
 
   const episode = await findEpisode(page.title, page.show);
-  if (episode) return episode;
+  // Prefer the episode's own artwork; fall back to the page's.
+  if (episode) return { ...episode, imageURL: episode.imageURL ?? page.image };
 
-  return { title: page.title, publisher: page.show ?? page.site };
+  return { title: page.title, publisher: page.show ?? page.site, imageURL: page.image };
 }
 
 /**
@@ -90,6 +92,8 @@ export async function resolveAppleEpisode(url: string): Promise<ResolvedItem | n
         collectionName?: string;
         episodeUrl?: string;
         trackTimeMillis?: number;
+        artworkUrl600?: string;
+        artworkUrl160?: string;
       }>;
     };
     const episode = (data.results ?? []).find(
@@ -100,6 +104,7 @@ export async function resolveAppleEpisode(url: string): Promise<ResolvedItem | n
       title: episode.trackName,
       publisher: episode.collectionName,
       audioURL: episode.episodeUrl,
+      imageURL: episode.artworkUrl600 ?? episode.artworkUrl160,
       durationSeconds: episode.trackTimeMillis
         ? Math.round(episode.trackTimeMillis / 1000)
         : undefined,
@@ -121,6 +126,8 @@ export interface PageMeta {
   show?: string;
   /** Site name, used as the publisher line for web items */
   site: string;
+  /** og:image / platform thumbnail, when the page offers one */
+  image?: string;
 }
 
 export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
@@ -201,7 +208,12 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
     }
   }
 
-  return { title, show: show ? cleanTitle(show) : undefined, site };
+  return {
+    title,
+    show: show ? cleanTitle(show) : undefined,
+    site,
+    image: meta('meta[property="og:image"]'),
+  };
 }
 
 /** A link that is a song/album/playlist by construction — never an episode. */
@@ -237,13 +249,18 @@ export async function fetchYouTubeOEmbed(url: string): Promise<PageMeta | null> 
       console.warn(`YouTube oEmbed for ${url} returned HTTP ${resp.status}`);
       return null;
     }
-    const data = (await resp.json()) as { title?: string; author_name?: string };
+    const data = (await resp.json()) as {
+      title?: string;
+      author_name?: string;
+      thumbnail_url?: string;
+    };
     const title = cleanTitle(data.title ?? '');
     if (!title) return null;
     return {
       title,
       show: data.author_name ? cleanTitle(data.author_name) : undefined,
       site: 'YouTube',
+      image: data.thumbnail_url,
     };
   } catch (err) {
     console.warn(`YouTube oEmbed failed for ${url}:`, (err as Error).message);
@@ -276,6 +293,8 @@ export function cleanTitle(raw: string): string {
 export interface ListenNotesEpisode {
   audio?: string;
   audio_length_sec?: number;
+  image?: string;
+  thumbnail?: string;
   title_original?: string;
   podcast?: {
     title_original?: string;
@@ -306,6 +325,7 @@ export async function findEpisode(title: string, show?: string): Promise<Resolve
         title: best.title_original ?? title,
         publisher: best.podcast?.title_original ?? best.podcast?.publisher_original,
         audioURL: best.audio,
+        imageURL: best.image ?? best.thumbnail,
         durationSeconds: best.audio_length_sec,
       };
     }

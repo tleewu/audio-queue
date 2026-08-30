@@ -9,6 +9,7 @@ struct QueueItem: Identifiable, Codable, Equatable {
     var title: String
     var publisher: String?
     var audioURL: String?
+    var imageURL: String?
     var durationSeconds: Int?
     var isListened: Bool
     var position: Int
@@ -24,6 +25,11 @@ extension QueueItem {
     }
 
     var webURL: URL? { URL(string: originalURL) }
+
+    var artworkURL: URL? {
+        guard let imageURL, !imageURL.isEmpty else { return nil }
+        return URL(string: imageURL)
+    }
 
     var formattedDuration: String? {
         guard let seconds = durationSeconds, seconds > 0 else { return nil }

@@ -72,6 +72,10 @@ struct PlayerView: View {
 
             Spacer(minLength: 0)
 
+            ArtworkView(url: item?.artworkURL, size: 260, cornerRadius: 12)
+                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+                .padding(.bottom, 32)
+
             VStack(spacing: 8) {
                 Text(item?.title ?? "")
                     .font(.title2)
