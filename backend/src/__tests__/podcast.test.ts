@@ -121,6 +121,24 @@ describe('resolve', () => {
     vi.unstubAllGlobals();
   });
 
+  // Regression: cleanTitle strips "- YouTube" to "", and q is the only required
+  // Listen Notes parameter — a blank one is a guaranteed HTTP 400.
+  it('never searches with a blank query when the title cleans to nothing', async () => {
+    process.env.LISTEN_NOTES_API_KEY = KEY;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        htmlResponse('<html><head><meta property="og:title" content="- YouTube"></head></html>'),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = await resolve('https://www.youtube.com/watch?v=gated');
+
+    expect(item.title).toBe('https://www.youtube.com/watch?v=gated');
+    // the page fetch only — no search request was ever made
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   // Regression: the old flat 400 KB cap sliced YouTube's <head> in half, so
   // og:title was never parsed and the item ended up titled by its raw URL.
   it('reads metadata out of a <head> far larger than a fixed byte cap', async () => {
