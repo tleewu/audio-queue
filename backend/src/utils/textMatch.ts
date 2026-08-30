@@ -46,3 +46,22 @@ export function queryCandidates(title: string): string[] {
   }
   return [...new Set(candidates.filter(Boolean))].slice(0, 4);
 }
+
+/**
+ * Does the YouTube channel name corroborate the candidate's podcast title?
+ * Names differ in shape ("All-In Podcast" vs "All-In with Chamath, Jason,
+ * Sacks & Friedberg"), so this compares ALL words — short ones carry the
+ * identity in names — after dropping generic filler.
+ */
+const SHOW_FILLER = new Set(['podcast', 'podcasts', 'show', 'the', 'with', 'official', 'channel', 'network']);
+
+export function showMatchScore(channelName: string, podcastTitle: string): number {
+  const words = (s: string) =>
+    new Set(normalizeTitle(s).split(/\s+/).filter((w) => w && !SHOW_FILLER.has(w)));
+  const channel = words(channelName);
+  if (channel.size === 0) return 0;
+  const podcast = words(podcastTitle);
+  let overlap = 0;
+  for (const w of channel) if (podcast.has(w)) overlap++;
+  return overlap / channel.size;
+}
