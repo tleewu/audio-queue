@@ -121,12 +121,46 @@ describe('resolve', () => {
     vi.unstubAllGlobals();
   });
 
+  // YouTube serves datacenter IPs a stub page titled "- YouTube"; oEmbed is a
+  // supported API and returns the real title and channel.
+  it('reads YouTube metadata from oEmbed instead of scraping the page', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ title: 'Nvidia Historic Quarter - YouTube', author_name: 'All-In Podcast' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = await resolve('https://www.youtube.com/watch?v=abc123&t=90s');
+
+    expect(item.title).toBe('Nvidia Historic Quarter');
+    expect(item.publisher).toBe('All-In Podcast');
+    const called = String(fetchMock.mock.calls[0][0]);
+    expect(called).toContain('/oembed');
+    expect(called).toContain(encodeURIComponent('https://www.youtube.com/watch?v=abc123&t=90s'));
+  });
+
+  it('falls back to scraping when oEmbed rejects the video', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, text: async () => '' } as unknown as Response)
+      .mockResolvedValueOnce(
+        htmlResponse('<html><head><meta property="og:title" content="Scraped Title"></head></html>'),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = await resolve('https://youtu.be/abc123');
+
+    expect(item.title).toBe('Scraped Title');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   // Regression: cleanTitle strips "- YouTube" to "", and q is the only required
   // Listen Notes parameter — a blank one is a guaranteed HTTP 400.
   it('never searches with a blank query when the title cleans to nothing', async () => {
     process.env.LISTEN_NOTES_API_KEY = KEY;
     const fetchMock = vi
       .fn()
+      // oEmbed declines the gated video, so we fall through to scraping
+      .mockResolvedValueOnce({ ok: false, status: 401, text: async () => '' } as unknown as Response)
       .mockResolvedValueOnce(
         htmlResponse('<html><head><meta property="og:title" content="- YouTube"></head></html>'),
       );
@@ -135,8 +169,8 @@ describe('resolve', () => {
     const item = await resolve('https://www.youtube.com/watch?v=gated');
 
     expect(item.title).toBe('https://www.youtube.com/watch?v=gated');
-    // the page fetch only — no search request was ever made
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // oEmbed + the page fetch — no search request was ever made
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   // Regression: the old flat 400 KB cap sliced YouTube's <head> in half, so
@@ -145,7 +179,9 @@ describe('resolve', () => {
     const filler = '<script>/*'.padEnd(900_000, 'x') + '*/</script>';
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(
+      vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 401, text: async () => '' } as unknown as Response)
+        .mockResolvedValueOnce(
         htmlResponse(`<html><head>${filler}
             <meta property="og:title" content="Never Gonna Give You Up - YouTube">
             <link itemprop="name" content="Rick Astley">
