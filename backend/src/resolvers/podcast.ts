@@ -50,6 +50,15 @@ export interface PageMeta {
 }
 
 export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
+  // YouTube serves datacenter IPs a stub page titled "- YouTube" while a
+  // browser gets the real thing, so scraping it from a server is unreliable by
+  // design. oEmbed is a supported API, returns exactly the title and channel we
+  // need, and is not subject to that treatment.
+  if (isYouTube(url)) {
+    const viaOEmbed = await fetchYouTubeOEmbed(url);
+    if (viaOEmbed) return viaOEmbed;
+  }
+
   let html: string;
   try {
     const resp = await fetchWithTimeout(
@@ -115,6 +124,39 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
   }
 
   return { title, show: show ? cleanTitle(show) : undefined, site };
+}
+
+function isYouTube(url: string): boolean {
+  const host = hostOf(url);
+  return host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com');
+}
+
+/** Title and channel straight from YouTube's oEmbed API — no page scraping. */
+export async function fetchYouTubeOEmbed(url: string): Promise<PageMeta | null> {
+  const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
+  try {
+    const resp = await fetchWithTimeout(
+      endpoint,
+      { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } },
+      PAGE_TIMEOUT_MS,
+    );
+    if (!resp.ok) {
+      // 401/404 here is normal for private, deleted, or age-gated videos.
+      console.warn(`YouTube oEmbed for ${url} returned HTTP ${resp.status}`);
+      return null;
+    }
+    const data = (await resp.json()) as { title?: string; author_name?: string };
+    const title = cleanTitle(data.title ?? '');
+    if (!title) return null;
+    return {
+      title,
+      show: data.author_name ? cleanTitle(data.author_name) : undefined,
+      site: 'YouTube',
+    };
+  } catch (err) {
+    console.warn(`YouTube oEmbed failed for ${url}:`, (err as Error).message);
+    return null;
+  }
 }
 
 function hostOf(url: string): string {
