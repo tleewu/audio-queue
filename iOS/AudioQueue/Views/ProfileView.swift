@@ -200,6 +200,9 @@ struct ArchiveView: View {
                         isPlaying: engine.isPlaying,
                         onPlayPause: { play(item) }
                     )
+                    // Separators default to aligning with the text, which leaves
+                    // them inset past the artwork. Run them the full width.
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if item.isPodcast {

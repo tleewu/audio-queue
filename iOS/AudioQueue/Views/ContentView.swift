@@ -116,6 +116,9 @@ struct ContentView: View {
                         secondsRemaining: secondsRemaining(for: item),
                         onPlayPause: { playPause(item) }
                     )
+                    // Separators default to aligning with the text, which leaves
+                    // them inset past the artwork. Run them the full width.
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     .contentShape(Rectangle())
                     .onTapGesture { open(item) }
                     .simultaneousGesture(

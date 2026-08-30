@@ -32,6 +32,11 @@ final class AudioEngine: ObservableObject {
     private var timeObserver: Any?
     private var itemEndObserver: NSObjectProtocol?
     private var lastPositionSave: Date = .distantPast
+    /// Lock-screen artwork, kept so rebuilding the info dictionary — which
+    /// happens on every play, pause and seek — does not drop the image or
+    /// refetch it. Keyed by url so a track change invalidates it.
+    private var artwork: (url: URL, image: MPMediaItemArtwork)?
+    private var artworkTask: Task<Void, Never>?
 
     private static let positionKey = "playbackPositions"
 
@@ -235,7 +240,43 @@ final class AudioEngine: ObservableObject {
         if let publisher = item.publisher {
             info[MPMediaItemPropertyArtist] = publisher
         }
+        if let artwork, artwork.url == item.artworkURL {
+            info[MPMediaItemPropertyArtwork] = artwork.image
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        loadArtworkIfNeeded(for: item)
+    }
+
+    /// Fetches the episode image once per item and re-publishes the info
+    /// dictionary with it. No-ops when it is already loaded or unavailable.
+    private func loadArtworkIfNeeded(for item: QueueItem) {
+        guard let url = item.artworkURL else {
+            artworkTask?.cancel()
+            artwork = nil
+            return
+        }
+        guard artwork?.url != url else { return }
+
+        artworkTask?.cancel()
+        artworkTask = Task { [weak self] in
+            guard
+                let (data, _) = try? await URLSession.shared.data(from: url),
+                let image = UIImage(data: data),
+                !Task.isCancelled
+            else { return }
+
+            await MainActor.run {
+                guard let self else { return }
+                // The track may have moved on while this was in flight.
+                guard self.currentItem?.artworkURL == url else { return }
+                self.artwork = (
+                    url,
+                    MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                )
+                self.updateNowPlaying()
+            }
+        }
     }
 
     private func updateNowPlayingTime() {
