@@ -31,13 +31,83 @@ const MAX_HTML_BYTES = 2_000_000;
 const MIN_TITLE_MATCH = 0.7;
 
 export async function resolve(url: string): Promise<ResolvedItem> {
+  // Apple episode links carry the collection and episode ids, and Apple's own
+  // lookup API returns the exact title, show, and direct audio URL — a match
+  // asserted by the platform itself, with no search to get wrong. It also
+  // works the moment an episode is published, where search indexes lag.
+  const apple = await resolveAppleEpisode(url);
+  if (apple) return apple;
+
   const page = await fetchPageMeta(url);
   if (!page) return { title: url };
+
+  // Music links are structurally not podcast episodes; searching the episode
+  // index for one can only produce false positives. Classified by URL shape,
+  // not og:type — Spotify labels its podcast episodes "music.song" too.
+  if (isMusicUrl(url)) {
+    return { title: page.title, publisher: page.show ?? page.site };
+  }
 
   const episode = await findEpisode(page.title, page.show);
   if (episode) return episode;
 
   return { title: page.title, publisher: page.show ?? page.site };
+}
+
+/**
+ * Resolve a podcasts.apple.com episode link via the iTunes lookup API.
+ * Returns null for anything that isn't an Apple episode URL, or when the
+ * episode isn't in the lookup window — the scraping pipeline takes over.
+ */
+export async function resolveAppleEpisode(url: string): Promise<ResolvedItem | null> {
+  if (!hostOf(url).endsWith('podcasts.apple.com')) return null;
+  let collectionId: string | undefined;
+  let episodeId: string | undefined;
+  try {
+    const parsed = new URL(url);
+    collectionId = parsed.pathname.match(/\/id(\d+)/)?.[1];
+    episodeId = parsed.searchParams.get('i') ?? undefined;
+  } catch {
+    return null;
+  }
+  if (!collectionId || !episodeId) return null;
+
+  try {
+    const resp = await fetchWithTimeout(
+      `https://itunes.apple.com/lookup?id=${collectionId}&entity=podcastEpisode&limit=200`,
+      { headers: { Accept: 'application/json' } },
+      SEARCH_TIMEOUT_MS,
+    );
+    if (!resp.ok) {
+      console.warn(`iTunes lookup for ${url} returned HTTP ${resp.status}`);
+      return null;
+    }
+    const data = (await resp.json()) as {
+      results?: Array<{
+        trackId?: number;
+        kind?: string;
+        trackName?: string;
+        collectionName?: string;
+        episodeUrl?: string;
+        trackTimeMillis?: number;
+      }>;
+    };
+    const episode = (data.results ?? []).find(
+      (r) => r.kind === 'podcast-episode' && String(r.trackId) === episodeId,
+    );
+    if (!episode?.trackName || !episode.episodeUrl) return null;
+    return {
+      title: episode.trackName,
+      publisher: episode.collectionName,
+      audioURL: episode.episodeUrl,
+      durationSeconds: episode.trackTimeMillis
+        ? Math.round(episode.trackTimeMillis / 1000)
+        : undefined,
+    };
+  } catch (err) {
+    console.warn(`iTunes lookup failed for ${url}:`, (err as Error).message);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +183,12 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
     return null;
   }
   let show =
-    // Spotify episode pages describe themselves as "Show Name · Episode"
-    meta('meta[property="og:description"]')?.match(/^(.+?)\s+·/)?.[1]?.trim() ??
+    // "Show Name · Episode" is Spotify's description format. Other sites put
+    // unrelated text there — Apple leads with "Podcast Episode · ..." — so the
+    // heuristic only applies on Spotify.
+    (host === 'open.spotify.com'
+      ? meta('meta[property="og:description"]')?.match(/^(.+?)\s+·/)?.[1]?.trim()
+      : undefined) ??
     meta('meta[name="author"]') ??
     $('link[itemprop="name"]').attr('content')?.trim(); // YouTube channel
 
@@ -128,6 +202,20 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
   }
 
   return { title, show: show ? cleanTitle(show) : undefined, site };
+}
+
+/** A link that is a song/album/playlist by construction — never an episode. */
+export function isMusicUrl(url: string): boolean {
+  const host = hostOf(url);
+  if (host === 'music.youtube.com') return true;
+  if (host === 'open.spotify.com') {
+    try {
+      return /^\/(track|album|artist|playlist)\//.test(new URL(url).pathname);
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 function isYouTube(url: string): boolean {
