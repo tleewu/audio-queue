@@ -360,14 +360,18 @@ describe('resolve', () => {
     expect(result).toEqual({ title: 'https://example.com/unreachable' });
   });
 
-  it('splits show and episode on Apple Podcasts titles', async () => {
+  it('splits show and episode on Apple Podcasts titles when the lookup misses', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(
-        htmlResponse(
-          '<html><head><meta property="og:title" content="‎The Daily: A very long day on Apple Podcasts"></head></html>',
+      vi
+        .fn()
+        // iTunes lookup window does not contain this old episode
+        .mockResolvedValueOnce(jsonResponse({ results: [] }))
+        .mockResolvedValueOnce(
+          htmlResponse(
+            '<html><head><meta property="og:title" content="‎The Daily: A very long day on Apple Podcasts"></head></html>',
+          ),
         ),
-      ),
     );
 
     const result = await resolve('https://podcasts.apple.com/us/podcast/the-daily/id1200361736?i=1');
