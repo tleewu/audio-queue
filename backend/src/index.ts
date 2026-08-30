@@ -4,12 +4,15 @@ import rateLimit from 'express-rate-limit';
 import authRouter from './routes/auth';
 import queueRouter from './routes/queue';
 import legalRouter from './routes/legal';
+import debugRouter from './routes/debug';
 import { requireAuth } from './middleware/auth';
 
 // Surface silent crashes in Railway logs
+// Log loudly, but do not take the server down. Route rejections are handled by
+// asyncHandler + the error middleware below; anything reaching here is a stray
+// promise, and killing a healthy process over one caused a day-long outage.
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason);
-  process.exit(1);
 });
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err);
@@ -54,6 +57,19 @@ app.use('/', legalRouter);
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/queue', apiLimiter, requireAuth, queueRouter);
+// Resolver diagnostics. Inert unless DEBUG_RESOLVE=1; see routes/debug.ts.
+app.use('/api/debug', apiLimiter, requireAuth, debugRouter);
+
+// Terminal error handler. Must come after the routes, and must take four
+// arguments for Express to recognise it as an error handler.
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(`Request failed: ${req.method} ${req.path}`, err);
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 const host = '0.0.0.0';
 app.listen(PORT, host, () => {

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma } from '../lib/prisma';
 import { resolve, ResolvedItem } from '../resolvers/podcast';
 import { assertPublicHttpUrl } from '../utils/urlGuard';
@@ -8,16 +9,16 @@ const router = Router();
 const MAX_QUEUE_ITEMS = 500;
 
 // GET /api/queue — the user's items in queue order
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+router.get('/', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const items = await prisma.queueItem.findMany({
     where: { userId: req.userId! },
     orderBy: { position: 'asc' },
   });
   res.json(items);
-});
+}));
 
 // POST /api/queue — resolve the link, then save it
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+router.post('/', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url?: string };
   if (!url || typeof url !== 'string' || url.length > 2048) {
     res.status(400).json({ error: 'url required' });
@@ -46,10 +47,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   // Resolution never throws away the link: anything that isn't a podcast
   // episode is saved as a web item and opened in a web view.
+  const startedAt = Date.now();
   const resolved: ResolvedItem = await resolve(trimmed).catch((err: unknown) => {
     console.error(`Resolution failed for ${trimmed}:`, (err as Error).message);
     return { title: trimmed };
   });
+
+  console.log(
+    `resolved ${trimmed} -> ${JSON.stringify(resolved.title)} ` +
+      `[${resolved.audioURL ? 'podcast' : 'web'}] in ${Date.now() - startedAt}ms`,
+  );
 
   const item = await prisma.queueItem.create({
     data: {
@@ -64,10 +71,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   });
 
   res.status(201).json(item);
-});
+}));
 
 // PATCH /api/queue/reorder — bulk position update
-router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
+router.patch('/reorder', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { order } = req.body as { order?: Array<{ id: string; position: number }> };
   if (!Array.isArray(order) || order.length > 1000) {
     res.status(400).json({ error: 'order array required' });
@@ -93,10 +100,10 @@ router.patch('/reorder', async (req: Request, res: Response): Promise<void> => {
     )
   );
   res.json({ ok: true });
-});
+}));
 
 // PATCH /api/queue/:id — archive / unarchive
-router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
+router.patch('/:id', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { isListened } = req.body as { isListened?: boolean };
   const item = await prisma.queueItem.findFirst({
     where: { id: req.params.id, userId: req.userId! },
@@ -111,10 +118,10 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
     data: { isListened: isListened ?? item.isListened },
   });
   res.json(updated);
-});
+}));
 
 // DELETE /api/queue/:id
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+router.delete('/:id', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const item = await prisma.queueItem.findFirst({
     where: { id: req.params.id, userId: req.userId! },
   });
@@ -124,6 +131,6 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   }
   await prisma.queueItem.delete({ where: { id: item.id } });
   res.status(204).send();
-});
+}));
 
 export default router;

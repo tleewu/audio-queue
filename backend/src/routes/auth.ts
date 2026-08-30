@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { asyncHandler } from '../middleware/asyncHandler';
 import jwt from 'jsonwebtoken';
 import type { User } from '@prisma/client';
 import { verifyAppleToken } from '../utils/appleAuth';
@@ -22,7 +23,7 @@ function publicUser(user: User) {
 
 // POST /api/auth/device — anonymous account keyed to a device-generated id.
 // Every install starts here; no sign-in required to use the app.
-router.post('/device', async (req: Request, res: Response): Promise<void> => {
+router.post('/device', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { deviceId } = req.body as { deviceId?: string };
   if (!deviceId || typeof deviceId !== 'string' || deviceId.length < 8 || deviceId.length > 128) {
     res.status(400).json({ error: 'deviceId required' });
@@ -41,12 +42,12 @@ router.post('/device', async (req: Request, res: Response): Promise<void> => {
     return;
   }
   res.json({ token, user: publicUser(user) });
-});
+}));
 
 // POST /api/auth/apple — sign in to sync. When the caller is already using an
 // anonymous account, that account is upgraded in place (or merged into the
 // existing Apple account) so nothing they saved is lost.
-router.post('/apple', optionalAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/apple', optionalAuth, asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { identityToken } = req.body as { identityToken?: string };
   if (!identityToken) {
     res.status(400).json({ error: 'identityToken required' });
@@ -90,7 +91,7 @@ router.post('/apple', optionalAuth, async (req: Request, res: Response): Promise
     console.error('Apple auth error:', err);
     res.status(401).json({ error: 'Authentication failed' });
   }
-});
+}));
 
 /** Moves one account's queue onto another, appending it after what's already there. */
 async function mergeQueue(fromUserId: string, toUserId: string): Promise<void> {
@@ -107,18 +108,18 @@ async function mergeQueue(fromUserId: string, toUserId: string): Promise<void> {
 }
 
 // GET /api/auth/me — validate the token and describe the session
-router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/me', requireAuth, asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) {
     res.status(401).json({ error: 'User not found' });
     return;
   }
   res.json(publicUser(user));
-});
+}));
 
 // DELETE /api/auth/account — permanently delete the account and all its data.
 // Required by App Store Review Guideline 5.1.1(v).
-router.delete('/account', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.delete('/account', requireAuth, asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     // Queue items cascade via the FK
     await prisma.user.delete({ where: { id: req.userId! } });
@@ -127,6 +128,6 @@ router.delete('/account', requireAuth, async (req: Request, res: Response): Prom
     console.error('Account deletion error:', err);
     res.status(500).json({ error: 'Failed to delete account' });
   }
-});
+}));
 
 export default router;

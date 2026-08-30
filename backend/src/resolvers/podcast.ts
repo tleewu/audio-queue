@@ -77,14 +77,23 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
     meta('meta[property="og:title"]') ??
     meta('meta[name="twitter:title"]') ??
     $('title').first().text().trim();
-  if (!rawTitle) return null;
+  if (!rawTitle) {
+    // No title at all usually means we were served something other than the
+    // real page — a consent wall or bot check, which datacenter IPs see far
+    // more often than a laptop does. Record enough to tell them apart.
+    console.warn(`No title found for ${url}: ${html.length} bytes, starts ${JSON.stringify(html.slice(0, 120))}`);
+    return null;
+  }
 
   const site = meta('meta[property="og:site_name"]') ?? host;
   let title = cleanTitle(rawTitle);
   // cleanTitle can strip a page title down to nothing — an age-gated or
   // unavailable YouTube video titles itself just "- YouTube". There is nothing
   // to search for, and Listen Notes rejects a blank q with a 400.
-  if (!title) return null;
+  if (!title) {
+    console.warn(`Title cleaned to nothing for ${url}: raw was ${JSON.stringify(rawTitle)}`);
+    return null;
+  }
   let show =
     // Spotify episode pages describe themselves as "Show Name · Episode"
     meta('meta[property="og:description"]')?.match(/^(.+?)\s+·/)?.[1]?.trim() ??
