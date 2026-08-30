@@ -29,3 +29,15 @@ func formatRemaining(_ seconds: Double) -> String {
     }
     return "\(mins) min left"
 }
+
+/// Format a run time for a queue row (e.g. "1 hr 37 min", "42 min"). The
+/// clock form ("1:36:41") belongs on the player scrubber, not in a list.
+func formatRunTime(_ seconds: Double) -> String {
+    let mins = Int((seconds / 60).rounded())
+    if mins >= 60 {
+        let h = mins / 60
+        let m = mins % 60
+        return m > 0 ? "\(h) hr \(m) min" : "\(h) hr"
+    }
+    return "\(max(mins, 1)) min"
+}

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// One line in the queue: title, publisher, and how much is left. Text only.
+/// One card in the queue: artwork and title on top, then how much is left with
+/// its progress, and the play control alone at the bottom right.
 struct QueueRowView: View {
     let item: QueueItem
     var isCurrent: Bool = false
@@ -9,54 +10,103 @@ struct QueueRowView: View {
     var onPlayPause: () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ArtworkView(url: item.artworkURL, size: 56)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                ArtworkView(url: item.artworkURL, size: 60)
 
-            VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
-                    .font(.subheadline)
-                    .fontWeight(isCurrent ? .semibold : .medium)
+                    .font(.headline)
+                    .fontWeight(isCurrent ? .bold : .semibold)
                     .foregroundStyle(.primary)
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 8)
-
-            if item.isPodcast {
-                Button(action: onPlayPause) {
-                    Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
+            HStack(spacing: 10) {
+                if let meta {
+                    Text(meta)
                         .font(.footnote)
-                        .foregroundStyle(Color(.systemBackground))
-                        .frame(width: 30, height: 30)
-                        .background(Color.primary)
-                        .clipShape(Circle())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
                 }
-                .buttonStyle(.plain)
-            } else {
-                Image(systemName: "arrow.up.forward")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 30)
-                    .accessibilityLabel("Opens in a web view")
+
+                if let progress {
+                    ProgressBar(fraction: progress)
+                        .frame(height: 4)
+                        .frame(maxWidth: 140)
+                }
+
+                Spacer(minLength: 8)
+
+                action
             }
         }
         .padding(.vertical, 8)
     }
 
-    /// "Publisher · 42 min left" — whichever parts we know.
-    private var subtitle: String {
-        var parts: [String] = []
-        if let publisher = item.publisher, !publisher.isEmpty { parts.append(publisher) }
-        if let secondsRemaining {
-            parts.append(formatRemaining(secondsRemaining))
-        } else if let duration = item.formattedDuration {
-            parts.append(duration)
+    // MARK: - Action
+
+    @ViewBuilder
+    private var action: some View {
+        if item.isPodcast {
+            Button(action: onPlayPause) {
+                Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Color(.systemBackground))
+                    .frame(width: 38, height: 38)
+                    .background(Color.primary)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isCurrent && isPlaying ? "Pause" : "Play")
+        } else {
+            Image(systemName: "arrow.up.forward")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 38, height: 38)
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.25), lineWidth: 1))
+                .accessibilityLabel("Opens in a web view")
         }
-        return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Meta
+
+    /// "7 min left" once started, otherwise the run time, otherwise the show.
+    private var meta: String? {
+        if let secondsRemaining { return formatRemaining(secondsRemaining) }
+        if let total = item.durationSeconds, total > 0 { return formatRunTime(Double(total)) }
+        guard let publisher = item.publisher, !publisher.isEmpty else { return nil }
+        return publisher
+    }
+
+    /// Only present once playback has actually started.
+    private var progress: Double? {
+        guard
+            let total = item.durationSeconds, total > 0,
+            let secondsRemaining
+        else { return nil }
+        let played = (Double(total) - secondsRemaining) / Double(total)
+        guard played > 0 else { return nil }
+        return min(max(played, 0), 1)
+    }
+}
+
+/// Monochrome play-progress track.
+private struct ProgressBar: View {
+    let fraction: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.25))
+                Capsule()
+                    .fill(Color.primary)
+                    .frame(width: geo.size.width * fraction)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
