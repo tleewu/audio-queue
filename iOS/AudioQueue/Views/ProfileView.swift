@@ -220,7 +220,7 @@ struct ArchiveView: View {
                         } label: {
                             Text("Unarchive")
                         }
-                        .tint(.blue)
+                        .tint(.secondary)
                     }
                 }
             }

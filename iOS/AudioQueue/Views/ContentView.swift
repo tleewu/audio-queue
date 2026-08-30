@@ -135,7 +135,7 @@ struct ContentView: View {
                         } label: {
                             Text("Archive")
                         }
-                        .tint(.green)
+                        .tint(.secondary)
                     }
                 }
                 .onMove { source, destination in
