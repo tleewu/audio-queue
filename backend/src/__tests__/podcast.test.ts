@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { pickBestEpisode, cleanTitle, findEpisode, resolve } from '../resolvers/podcast';
+import { containmentScore, queryCandidates } from '../utils/textMatch';
 
 const KEY = 'test-listen-notes-key';
 
@@ -115,10 +116,82 @@ describe('findEpisode', () => {
   });
 });
 
+describe('queryCandidates', () => {
+  it('probes the full title first, then drops trailing segments', () => {
+    expect(
+      queryCandidates('Gary Gallagher: Civil War | Lex Fridman Podcast #499'),
+    ).toEqual([
+      'Gary Gallagher: Civil War | Lex Fridman Podcast #499',
+      'Gary Gallagher: Civil War',
+    ]);
+  });
+
+  it('returns an undecorated title as a single candidate', () => {
+    expect(queryCandidates('Nvidia Historic Quarter, SaaS Comeback')).toEqual([
+      'Nvidia Historic Quarter, SaaS Comeback',
+    ]);
+  });
+});
+
+describe('containmentScore', () => {
+  it('is asymmetric: extra haystack words never lower the score', () => {
+    expect(containmentScore('civil slavery lincoln', 'gary civil slavery lincoln fridman podcast')).toBe(1);
+  });
+
+  it('punishes needle words missing from the haystack', () => {
+    // "taylormade" and "golf" are nowhere in the page title
+    expect(containmentScore('gary gallagher taylormade golf', 'gary gallagher civil slavery')).toBe(0.5);
+  });
+});
+
 describe('resolve', () => {
   afterEach(() => {
     delete process.env.LISTEN_NOTES_API_KEY;
     vi.unstubAllGlobals();
+  });
+
+  // Generic decorated-title handling: the full page title finds nothing in the
+  // search index, the trimmed probe finds the episode, and acceptance is
+  // judged against the full page title — so a lookalike from the short probe
+  // is rejected while the real episode is kept.
+  it('retries with a trimmed query and accepts only episodes contained in the page title', async () => {
+    process.env.LISTEN_NOTES_API_KEY = KEY;
+    const fetchMock = vi
+      .fn()
+      // oEmbed hands back the decorated YouTube title
+      .mockResolvedValueOnce(
+        jsonResponse({
+          title: 'Gary Gallagher: American Civil War, Slavery, Lincoln | Lex Fridman Podcast #499',
+          author_name: 'Lex Fridman',
+        }),
+      )
+      // probe 1: full decorated title — index has nothing
+      .mockResolvedValueOnce(jsonResponse({ results: [] }))
+      // probe 2: trimmed — returns a lookalike and the real episode
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [
+            {
+              audio: 'https://cdn.example.com/golf.mp3',
+              title_original: 'Gary Gallagher – TaylorMade Golf Special',
+              podcast: { title_original: 'Golf Weekly' },
+            },
+            {
+              audio: 'https://cdn.example.com/lex499.mp3',
+              audio_length_sec: 9000,
+              title_original: '#499 – Gary Gallagher: American Civil War, Slavery, Lincoln',
+              podcast: { title_original: 'Lex Fridman Podcast' },
+            },
+          ],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = await resolve('https://www.youtube.com/watch?v=XyXBwO5jYpw');
+
+    expect(item.title).toBe('#499 – Gary Gallagher: American Civil War, Slavery, Lincoln');
+    expect(item.audioURL).toBe('https://cdn.example.com/lex499.mp3');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   // YouTube serves datacenter IPs a stub page titled "- YouTube"; oEmbed is a

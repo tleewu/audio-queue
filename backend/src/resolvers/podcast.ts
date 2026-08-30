@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { normalizeTitle, wordOverlapScore } from '../utils/textMatch';
+import { containmentScore, normalizeTitle, queryCandidates } from '../utils/textMatch';
 
 /**
  * A saved link resolves to exactly one of two things:
@@ -23,8 +23,12 @@ const PAGE_TIMEOUT_MS = 6_000;
 const SEARCH_TIMEOUT_MS = 8_000;
 /** Fallback cap for pages that never close <head>. */
 const MAX_HTML_BYTES = 2_000_000;
-/** Minimum share of significant words an episode title must have in common. */
-const MIN_TITLE_MATCH = 0.5;
+/**
+ * Minimum share of the episode title's significant words that must appear in
+ * the page title. A true match contains the episode title almost verbatim and
+ * scores ~1.0, so anything much lower is a different episode.
+ */
+const MIN_TITLE_MATCH = 0.7;
 
 export async function resolve(url: string): Promise<ResolvedItem> {
   const page = await fetchPageMeta(url);
@@ -201,19 +205,38 @@ export async function findEpisode(title: string, show?: string): Promise<Resolve
   const apiKey = process.env.LISTEN_NOTES_API_KEY?.trim();
   if (!apiKey) return null;
 
+  // The page title is the episode title plus platform decorations, and the
+  // search index only knows the former — so the full title can find nothing
+  // while a trimmed one hits exactly. Probe most-specific first; acceptance is
+  // always judged against the full page title, so a short probe cannot
+  // false-positive its way in.
+  for (const query of queryCandidates(title)) {
+    const episodes = await searchEpisodes(apiKey, query);
+    const best = pickBestEpisode(episodes, title, show);
+    if (best?.audio) {
+      return {
+        title: best.title_original ?? title,
+        publisher: best.podcast?.title_original ?? best.podcast?.publisher_original,
+        audioURL: best.audio,
+        durationSeconds: best.audio_length_sec,
+      };
+    }
+  }
+  return null;
+}
+
+async function searchEpisodes(apiKey: string, query: string): Promise<ListenNotesEpisode[]> {
   // q is the only required parameter; a blank one is a guaranteed 400.
-  const query = title.trim();
-  if (!query) return null;
+  if (!query.trim()) return [];
 
   const params = new URLSearchParams({
-    q: query,
+    q: query.trim(),
     type: 'episode',
     only_in: 'title',
     safe_mode: '0',
     page_size: '10',
   });
 
-  let episodes: ListenNotesEpisode[];
   try {
     const resp = await fetchWithTimeout(
       `https://listen-api.listennotes.com/api/v2/search?${params}`,
@@ -225,35 +248,31 @@ export async function findEpisode(title: string, show?: string): Promise<Resolve
       const detail = await resp.text().catch(() => '');
       console.warn(
         `Listen Notes search failed: HTTP ${resp.status} ${detail.slice(0, 300)} ` +
-          `(q=${JSON.stringify(title)}, len=${title.length})`,
+          `(q=${JSON.stringify(query)}, len=${query.length})`,
       );
-      return null;
+      return [];
     }
     const data = (await resp.json()) as { results?: ListenNotesEpisode[] };
-    episodes = data.results ?? [];
+    return data.results ?? [];
   } catch (err) {
     console.warn('Listen Notes search error:', (err as Error).message);
-    return null;
+    return [];
   }
-
-  const best = pickBestEpisode(episodes, title, show);
-  if (!best?.audio) return null;
-
-  return {
-    title: best.title_original ?? title,
-    publisher: best.podcast?.title_original ?? best.podcast?.publisher_original,
-    audioURL: best.audio,
-    durationSeconds: best.audio_length_sec,
-  };
 }
 
-/** Score candidates by title overlap; a matching show name breaks ties. */
+/**
+ * Accept an episode only when its own title is contained in the page title.
+ * The containment is asymmetric — extra words in the page title (platform
+ * decorations, show names, episode numbers) never lower the score — which is
+ * what lets the search be probed with trimmed queries safely. A matching show
+ * name breaks ties.
+ */
 export function pickBestEpisode(
   episodes: ListenNotesEpisode[],
-  title: string,
+  pageTitle: string,
   show?: string,
 ): ListenNotesEpisode | null {
-  const target = normalizeTitle(title);
+  const target = normalizeTitle(pageTitle);
   const targetShow = show ? normalizeTitle(show) : null;
 
   let best: ListenNotesEpisode | null = null;
@@ -261,10 +280,10 @@ export function pickBestEpisode(
 
   for (const episode of episodes) {
     if (!episode.audio || !episode.title_original) continue;
-    let score = wordOverlapScore(normalizeTitle(episode.title_original), target);
+    let score = containmentScore(normalizeTitle(episode.title_original), target);
     if (score < MIN_TITLE_MATCH) continue;
     if (targetShow && episode.podcast?.title_original) {
-      score += wordOverlapScore(normalizeTitle(episode.podcast.title_original), targetShow);
+      score += containmentScore(normalizeTitle(episode.podcast.title_original), targetShow);
     }
     if (score > bestScore) {
       bestScore = score;
