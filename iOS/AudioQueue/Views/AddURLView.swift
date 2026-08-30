@@ -38,8 +38,8 @@ struct AddURLView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(isValidURL ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .foregroundStyle(.white)
+                        .background(isValidURL ? Color.primary : Color.secondary.opacity(0.3))
+                        .foregroundStyle(Color(.systemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .disabled(!isValidURL)

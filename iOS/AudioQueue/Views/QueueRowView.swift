@@ -14,7 +14,7 @@ struct QueueRowView: View {
                 Text(item.title)
                     .font(.subheadline)
                     .fontWeight(isCurrent ? .semibold : .medium)
-                    .foregroundStyle(isCurrent ? Color.accentColor : .primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(3)
 
                 Text(subtitle)
@@ -29,20 +29,18 @@ struct QueueRowView: View {
                 Button(action: onPlayPause) {
                     Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
                         .font(.footnote)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(.systemBackground))
                         .frame(width: 30, height: 30)
-                        .background(Color.accentColor)
+                        .background(Color.primary)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
             } else {
-                Text("Web")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
+                Image(systemName: "arrow.up.forward")
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    .frame(width: 30, height: 30)
+                    .accessibilityLabel("Opens in a web view")
             }
         }
         .padding(.vertical, 8)

@@ -52,7 +52,7 @@ struct PlayerBar: View {
     private var progressLine: some View {
         GeometryReader { geo in
             Rectangle()
-                .fill(Color.accentColor)
+                .fill(Color.primary)
                 .frame(width: geo.size.width * engine.progress)
         }
         .frame(height: 2)
@@ -178,9 +178,9 @@ struct PlayerView: View {
                         .fontWeight(isSelected ? .bold : .regular)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(isSelected ? Color.accentColor.opacity(0.15) : .clear))
+                        .background(Capsule().fill(isSelected ? Color.primary.opacity(0.12) : .clear))
                 }
-                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .foregroundStyle(isSelected ? Color.primary : .secondary)
             }
         }
         .padding(.horizontal, 12)

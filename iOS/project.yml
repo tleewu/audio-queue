@@ -8,7 +8,7 @@ options:
 
 settings:
   SWIFT_VERSION: "5.9"
-  DEVELOPMENT_TEAM: "theowu93@gmail.com"  # fill in your Team ID
+  DEVELOPMENT_TEAM: "QDNXLUBN47"
 
 schemes:
   AudioQueue:
@@ -40,6 +40,8 @@ targets:
         UIBackgroundModes:
           - audio
         CFBundleDisplayName: cue
+        # Required for full-screen window (no black bars on device). Do not remove.
+        UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
