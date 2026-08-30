@@ -81,6 +81,10 @@ export async function fetchPageMeta(url: string): Promise<PageMeta | null> {
 
   const site = meta('meta[property="og:site_name"]') ?? host;
   let title = cleanTitle(rawTitle);
+  // cleanTitle can strip a page title down to nothing — an age-gated or
+  // unavailable YouTube video titles itself just "- YouTube". There is nothing
+  // to search for, and Listen Notes rejects a blank q with a 400.
+  if (!title) return null;
   let show =
     // Spotify episode pages describe themselves as "Show Name · Episode"
     meta('meta[property="og:description"]')?.match(/^(.+?)\s+·/)?.[1]?.trim() ??
@@ -141,8 +145,12 @@ export async function findEpisode(title: string, show?: string): Promise<Resolve
   const apiKey = process.env.LISTEN_NOTES_API_KEY?.trim();
   if (!apiKey) return null;
 
+  // q is the only required parameter; a blank one is a guaranteed 400.
+  const query = title.trim();
+  if (!query) return null;
+
   const params = new URLSearchParams({
-    q: title,
+    q: query,
     type: 'episode',
     only_in: 'title',
     safe_mode: '0',
@@ -157,7 +165,12 @@ export async function findEpisode(title: string, show?: string): Promise<Resolve
       SEARCH_TIMEOUT_MS,
     );
     if (!resp.ok) {
-      console.warn(`Listen Notes search failed: HTTP ${resp.status}`);
+      // Listen Notes explains 4xx in the body; without it a 400 is undiagnosable.
+      const detail = await resp.text().catch(() => '');
+      console.warn(
+        `Listen Notes search failed: HTTP ${resp.status} ${detail.slice(0, 300)} ` +
+          `(q=${JSON.stringify(title)}, len=${title.length})`,
+      );
       return null;
     }
     const data = (await resp.json()) as { results?: ListenNotesEpisode[] };
