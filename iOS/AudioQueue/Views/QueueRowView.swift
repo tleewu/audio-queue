@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One card in the queue: artwork and title on top, then how much is left with
-/// its progress, and the play control alone at the bottom right.
+/// One row in the queue: artwork, title, and how much is left underneath it,
+/// with the play control on the right in line with the artwork.
 struct QueueRowView: View {
     let item: QueueItem
     var isCurrent: Bool = false
@@ -10,39 +10,37 @@ struct QueueRowView: View {
     var onPlayPause: () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                ArtworkView(url: item.artworkURL, size: 60)
+        HStack(alignment: .center, spacing: 12) {
+            ArtworkView(url: item.artworkURL, size: 56)
 
+            VStack(alignment: .leading, spacing: 6) {
                 Text(item.title)
-                    .font(.headline)
-                    .fontWeight(isCurrent ? .bold : .semibold)
+                    .font(.subheadline)
+                    .fontWeight(isCurrent ? .semibold : .medium)
                     .foregroundStyle(.primary)
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    if let meta {
+                        Text(meta)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                    }
+
+                    if let progress {
+                        ProgressBar(fraction: progress)
+                            .frame(height: 3)
+                            .frame(maxWidth: 96)
+                    }
+                }
             }
 
-            HStack(spacing: 10) {
-                if let meta {
-                    Text(meta)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .layoutPriority(1)
-                }
+            Spacer(minLength: 8)
 
-                if let progress {
-                    ProgressBar(fraction: progress)
-                        .frame(height: 4)
-                        .frame(maxWidth: 140)
-                }
-
-                Spacer(minLength: 8)
-
-                action
-            }
+            action
         }
         .padding(.vertical, 8)
     }
@@ -54,9 +52,9 @@ struct QueueRowView: View {
         if item.isPodcast {
             Button(action: onPlayPause) {
                 Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(Color(.systemBackground))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 34, height: 34)
                     .background(Color.primary)
                     .clipShape(Circle())
             }
@@ -64,9 +62,9 @@ struct QueueRowView: View {
             .accessibilityLabel(isCurrent && isPlaying ? "Pause" : "Play")
         } else {
             Image(systemName: "arrow.up.forward")
-                .font(.subheadline.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.primary)
-                .frame(width: 38, height: 38)
+                .frame(width: 34, height: 34)
                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.25), lineWidth: 1))
                 .accessibilityLabel("Opens in a web view")
         }
