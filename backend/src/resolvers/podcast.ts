@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { containmentScore, normalizeTitle, queryCandidates } from '../utils/textMatch';
+import { containmentScore, normalizeTitle, queryCandidates, showMatchScore } from '../utils/textMatch';
 
 /**
  * A saved link resolves to exactly one of two things:
@@ -278,13 +278,28 @@ export function pickBestEpisode(
   let best: ListenNotesEpisode | null = null;
   let bestScore = 0;
 
+  const distinctiveWords = target.split(/\s+/).filter((w) => w.length > 3).length;
+
   for (const episode of episodes) {
     if (!episode.audio || !episode.title_original) continue;
-    let score = containmentScore(normalizeTitle(episode.title_original), target);
-    if (score < MIN_TITLE_MATCH) continue;
-    if (targetShow && episode.podcast?.title_original) {
-      score += containmentScore(normalizeTitle(episode.podcast.title_original), targetShow);
+    const titleScore = containmentScore(normalizeTitle(episode.title_original), target);
+    if (titleScore < MIN_TITLE_MATCH) continue;
+
+    const showScore =
+      targetShow && episode.podcast?.title_original
+        ? showMatchScore(targetShow, normalizeTitle(episode.podcast.title_original))
+        : 0;
+
+    // When we know the show, demand it corroborates the match — unless the
+    // title evidence alone is overwhelming. Channel and feed names legitimately
+    // diverge ("PowerfulJRE" vs "The Joe Rogan Experience"), so a near-exact,
+    // distinctive title may stand on its own; a short generic one may not
+    // cross shows.
+    if (targetShow && showScore < 0.5 && !(titleScore >= 0.9 && distinctiveWords >= 4)) {
+      continue;
     }
+
+    const score = titleScore + showScore;
     if (score > bestScore) {
       bestScore = score;
       best = episode;

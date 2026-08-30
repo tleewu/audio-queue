@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { pickBestEpisode, cleanTitle, findEpisode, resolve } from '../resolvers/podcast';
-import { containmentScore, queryCandidates } from '../utils/textMatch';
+import { containmentScore, queryCandidates, showMatchScore } from '../utils/textMatch';
 
 const KEY = 'test-listen-notes-key';
 
@@ -141,6 +141,38 @@ describe('containmentScore', () => {
   it('punishes needle words missing from the haystack', () => {
     // "taylormade" and "golf" are nowhere in the page title
     expect(containmentScore('gary gallagher taylormade golf', 'gary gallagher civil slavery')).toBe(0.5);
+  });
+});
+
+describe('showMatchScore', () => {
+  it('keeps short identity words that significant-word filters would drop', () => {
+    expect(showMatchScore('All-In Podcast', 'All-In with Chamath, Jason, Sacks & Friedberg')).toBe(1);
+  });
+
+  it('scores unrelated shows at zero, ignoring generic filler', () => {
+    expect(showMatchScore('All-In Podcast', 'The Daily Podcast Show')).toBe(0);
+  });
+});
+
+describe('pickBestEpisode show corroboration', () => {
+  const collision = {
+    audio: 'https://cdn.example.com/other.mp3',
+    title_original: 'Market Meltdown Explained',
+    podcast: { title_original: 'Some Other Finance Show' },
+  };
+
+  it('rejects a cross-show match on a short generic title', () => {
+    expect(pickBestEpisode([collision], 'Market Meltdown Explained', 'All-In Podcast')).toBeNull();
+  });
+
+  it('accepts a distinctive near-exact title even when channel and feed names diverge', () => {
+    const jre = {
+      audio: 'https://cdn.example.com/jre.mp3',
+      title_original: 'Joe Rogan Experience #2000 - Duncan Trussell Returns Again',
+      podcast: { title_original: 'The Joe Rogan Experience' },
+    };
+    // channel "PowerfulJRE" shares no words with the feed name
+    expect(pickBestEpisode([jre], 'Joe Rogan Experience #2000 - Duncan Trussell Returns Again', 'PowerfulJRE')).toBe(jre);
   });
 });
 
