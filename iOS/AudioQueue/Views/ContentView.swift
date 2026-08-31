@@ -58,6 +58,9 @@ struct ContentView: View {
     private func refresh() async {
         await queueVM.load()
         await queueVM.drainSharedURLs()
+        // Open connections for what is most likely to be played next, so
+        // pressing play is not the first time we touch the network.
+        engine.prewarm(queueVM.queue.filter(\.isPodcast))
     }
 
     // MARK: - Header
@@ -116,6 +119,7 @@ struct ContentView: View {
                         isCurrent: engine.currentItem?.id == item.id,
                         isPlaying: engine.isPlaying,
                         secondsRemaining: secondsRemaining(for: item),
+                        isLoading: engine.isLoading,
                         onPlayPause: { playPause(item) }
                     )
                     // Separators default to aligning with the text, which leaves

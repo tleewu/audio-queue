@@ -15,6 +15,9 @@ final class AudioEngine: ObservableObject {
     @Published private(set) var currentTime: Double = 0
     @Published private(set) var duration: Double = 0
     @Published private(set) var playbackRate: Float = 1.0
+    /// True between pressing play and audio actually starting, so the UI can
+    /// show the wait rather than looking inert.
+    @Published private(set) var isLoading = false
 
     let supportedRates: [Float] = [0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -37,6 +40,17 @@ final class AudioEngine: ObservableObject {
     /// refetch it. Keyed by url so a track change invalidates it.
     private var artwork: (url: URL, image: MPMediaItemArtwork)?
     private var artworkTask: Task<Void, Never>?
+
+    /// Seeks are tolerant by a second. An exact seek has to fetch and decode
+    /// from the preceding keyframe before anything is heard, which is the
+    /// difference between instant and a visible pause. A second either way is
+    /// imperceptible in speech.
+    private static let seekTolerance = CMTime(seconds: 1, preferredTimescale: 600)
+    /// Position playback was asked to start from, used to tell "still loading"
+    /// from "actually running".
+    private var loadingFrom: Double = 0
+    /// Assets opened ahead of being played, keyed by item id.
+    private var warmedAssets: [String: AVURLAsset] = [:]
 
     private static let positionKey = "playbackPositions"
     /// The footer stays on the last thing played, across launches.
@@ -65,14 +79,30 @@ final class AudioEngine: ObservableObject {
         isPlaying = true
         lastPositionSave = Date()
 
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
-        player.playImmediately(atRate: playbackRate)
+        // Reuse the connection opened by prewarm when there is one.
+        let asset = warmedAssets.removeValue(forKey: item.id) ?? AVURLAsset(url: url)
+        player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
 
         let resumeAt = savedPosition(for: item.id) ?? 0
         currentTime = resumeAt
+        loadingFrom = resumeAt
+        isLoading = true
+
+        // Seek first, then play. Playing first buffers at zero and then buffers
+        // again at the resume point — two round trips before any audio.
         if resumeAt > 0 {
-            player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600),
-                        toleranceBefore: .zero, toleranceAfter: .zero)
+            player.seek(
+                to: CMTime(seconds: resumeAt, preferredTimescale: 600),
+                toleranceBefore: Self.seekTolerance,
+                toleranceAfter: Self.seekTolerance
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.isPlaying else { return }
+                    self.player.playImmediately(atRate: self.playbackRate)
+                }
+            }
+        } else {
+            player.playImmediately(atRate: playbackRate)
         }
 
         observeDuration()
@@ -100,7 +130,8 @@ final class AudioEngine: ObservableObject {
     func seek(to seconds: Double) {
         let target = max(0, seconds)
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600),
-                    toleranceBefore: .zero, toleranceAfter: .zero)
+                    toleranceBefore: Self.seekTolerance,
+                    toleranceAfter: Self.seekTolerance)
         currentTime = target
         updateNowPlaying()
     }
@@ -126,6 +157,7 @@ final class AudioEngine: ObservableObject {
         currentTime = 0
         duration = 0
         isPlaying = false
+        isLoading = false
         updateNowPlaying()
     }
 
@@ -182,6 +214,12 @@ final class AudioEngine: ObservableObject {
             guard let self, time.seconds.isFinite else { return }
             MainActor.assumeIsolated {
                 self.currentTime = time.seconds
+                // timeControlStatus reports .playing before any audio comes
+                // out when automaticallyWaitsToMinimizeStalling is off, so the
+                // only honest signal is the clock actually moving.
+                if self.isLoading, time.seconds > self.loadingFrom + 0.05 {
+                    self.isLoading = false
+                }
                 self.updateNowPlayingTime()
                 self.savePositionThrottled()
             }
@@ -236,6 +274,7 @@ final class AudioEngine: ObservableObject {
         upNext = []
         currentTime = 0
         isPlaying = false
+        isLoading = false
         updateNowPlaying()
     }
 
@@ -243,6 +282,31 @@ final class AudioEngine: ObservableObject {
     func forget(_ itemId: String) {
         guard currentItem?.id == itemId else { return }
         stop()
+    }
+
+    // MARK: - Warm Start
+
+    /// Opens connections for the episodes most likely to be played next. The
+    /// bulk of the delay after pressing play is DNS, TLS and the first range
+    /// request — doing that ahead of time is most of the perceived wait.
+    func prewarm(_ items: [QueueItem]) {
+        // The footer restores the last thing played, so that episode is the
+        // likeliest next press and must be warmed first — not skipped for
+        // being "current", which was leaving the one that matters cold.
+        var ordered = items
+        if let current = currentItem, let idx = ordered.firstIndex(where: { $0.id == current.id }) {
+            ordered.insert(ordered.remove(at: idx), at: 0)
+        } else if let current = currentItem, current.isPodcast {
+            ordered.insert(current, at: 0)
+        }
+        for item in ordered.prefix(3) {
+            guard let url = item.playbackURL, warmedAssets[item.id] == nil else { continue }
+            let asset = AVURLAsset(url: url)
+            warmedAssets[item.id] = asset
+            Task.detached { _ = try? await asset.load(.isPlayable) }
+        }
+        // Do not accumulate assets for a queue the user keeps scrolling.
+        if warmedAssets.count > 6 { warmedAssets.removeAll() }
     }
 
     // MARK: - Last Played

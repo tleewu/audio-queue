@@ -7,6 +7,7 @@ struct QueueRowView: View {
     var isCurrent: Bool = false
     var isPlaying: Bool = false
     var secondsRemaining: Double? = nil
+    var isLoading: Bool = false
     var onPlayPause: () -> Void = {}
 
     var body: some View {
@@ -51,12 +52,20 @@ struct QueueRowView: View {
     private var action: some View {
         if item.isPodcast {
             Button(action: onPlayPause) {
-                Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
-                    .font(.footnote)
-                    .foregroundStyle(Color(.systemBackground))
-                    .frame(width: 34, height: 34)
-                    .background(Color.primary)
-                    .clipShape(Circle())
+                Group {
+                    if isCurrent && isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Color(.systemBackground))
+                    } else {
+                        Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
+                            .font(.footnote)
+                            .foregroundStyle(Color(.systemBackground))
+                    }
+                }
+                .frame(width: 34, height: 34)
+                .background(Color.primary)
+                .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isCurrent && isPlaying ? "Pause" : "Play")
