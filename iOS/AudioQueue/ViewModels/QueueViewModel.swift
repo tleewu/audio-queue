@@ -1,4 +1,3 @@
-import Combine
 import Foundation
 
 /// The queue: loads items from the backend, adds shared links, and keeps
@@ -19,15 +18,6 @@ final class QueueViewModel: ObservableObject {
 
     private let appGroupID = "group.com.theowu.audioqueue"
     private let pendingKey = "pendingURLs"
-    private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        // Finishing an episode archives it, so the queue is what is left to
-        // hear rather than a list the user has to tidy by hand.
-        AudioEngine.shared.finished
-            .sink { [weak self] item in self?.setListened(item, true) }
-            .store(in: &cancellables)
-    }
 
     // MARK: - Loading
 
