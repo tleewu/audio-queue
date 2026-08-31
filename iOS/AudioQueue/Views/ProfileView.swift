@@ -215,14 +215,20 @@ struct ArchiveView: View {
                     // destroys; explicit tints keep both readable in dark mode.
                     .swipeActions(edge: .trailing) {
                         Button {
-                            queueVM.setListened(item, false)
+                            Haptics.light()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.setListened(item, false)
+                            }
                         } label: {
                             Label("Unarchive", systemImage: "tray.and.arrow.up.fill")
                         }
                         .tint(.gray)
 
                         Button(role: .destructive) {
-                            queueVM.delete(item)
+                            Haptics.medium()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.delete(item)
+                            }
                         } label: {
                             Label("Delete", systemImage: "trash.fill")
                         }

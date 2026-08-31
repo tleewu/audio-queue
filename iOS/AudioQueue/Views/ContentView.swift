@@ -135,14 +135,20 @@ struct ContentView: View {
                     // .primary tint and render white-on-white in dark mode.
                     .swipeActions(edge: .trailing) {
                         Button {
-                            queueVM.setListened(item, true)
+                            Haptics.light()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.setListened(item, true)
+                            }
                         } label: {
                             Label("Archive", systemImage: "archivebox.fill")
                         }
                         .tint(.gray)
 
                         Button(role: .destructive) {
-                            queueVM.delete(item)
+                            Haptics.medium()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.delete(item)
+                            }
                         } label: {
                             Label("Delete", systemImage: "trash.fill")
                         }
