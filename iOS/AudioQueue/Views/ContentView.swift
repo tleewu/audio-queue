@@ -16,14 +16,16 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             list
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .bottom) {
+            // A real sibling rather than a safeAreaInset. The inset form has to
+            // re-measure when its conditional content appears and when the list
+            // grows, and a stale measurement leaves the bar stranded mid-screen.
+            // As the last element of the stack it is always at the bottom.
             if engine.currentItem != nil {
                 PlayerBar { showPlayer = true }
                     .transition(.move(edge: .bottom))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(.easeInOut(duration: 0.2), value: engine.currentItem?.id)
         .sheet(isPresented: $showAddURL) {
             AddURLView { urlString in
@@ -56,6 +58,9 @@ struct ContentView: View {
     private func refresh() async {
         await queueVM.load()
         await queueVM.drainSharedURLs()
+        // Open connections for what is most likely to be played next, so
+        // pressing play is not the first time we touch the network.
+        engine.prewarm(queueVM.queue.filter(\.isPodcast))
     }
 
     // MARK: - Header
@@ -114,8 +119,12 @@ struct ContentView: View {
                         isCurrent: engine.currentItem?.id == item.id,
                         isPlaying: engine.isPlaying,
                         secondsRemaining: secondsRemaining(for: item),
+                        isLoading: engine.isLoading,
                         onPlayPause: { playPause(item) }
                     )
+                    // Separators default to aligning with the text, which leaves
+                    // them inset past the artwork. Run them the full width.
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     .contentShape(Rectangle())
                     .onTapGesture { open(item) }
                     .simultaneousGesture(
@@ -123,19 +132,31 @@ struct ContentView: View {
                             withAnimation { isReordering = true }
                         }
                     )
+                    // First button is what a full swipe triggers, so Archive
+                    // leads: a stray swipe should file something away, never
+                    // destroy it. Both carry explicit tints — a destructive
+                    // button would otherwise inherit the app's monochrome
+                    // .primary tint and render white-on-white in dark mode.
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            queueVM.delete(item)
-                        } label: {
-                            Text("Delete")
-                        }
-
                         Button {
-                            queueVM.setListened(item, true)
+                            Haptics.light()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.setListened(item, true)
+                            }
                         } label: {
-                            Text("Archive")
+                            Label("Archive", systemImage: "archivebox.fill")
                         }
-                        .tint(.secondary)
+                        .tint(.gray)
+
+                        Button(role: .destructive) {
+                            Haptics.medium()
+                            withAnimation(.easeInOut(duration: 0.28)) {
+                                queueVM.delete(item)
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash.fill")
+                        }
+                        .tint(.red)
                     }
                 }
                 .onMove { source, destination in
