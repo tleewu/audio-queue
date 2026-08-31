@@ -41,6 +41,15 @@ final class AudioEngine: ObservableObject {
     private static let positionKey = "playbackPositions"
     /// The footer stays on the last thing played, across launches.
     private static let lastItemKey = "lastPlayedItem"
+    /// An episode counts as finished with a minute still to run. Outros and
+    /// credits get skipped routinely, so waiting for the literal end leaves
+    /// episodes you have plainly finished sitting in the queue.
+    private static let finishedThreshold: Double = 60
+
+    /// Emits an episode once it counts as listened, so the queue can archive
+    /// it. Ids are remembered for the session so it fires once per playthrough.
+    let finished = PassthroughSubject<QueueItem, Never>()
+    private var finishedIds: Set<String> = []
 
     private init() {
         player.automaticallyWaitsToMinimizeStalling = false
@@ -60,6 +69,7 @@ final class AudioEngine: ObservableObject {
         savePositionNow()
         self.upNext = upNext
         currentItem = item
+        finishedIds.remove(item.id) // replaying should archive again
         rememberLastPlayed(item)
         duration = Double(item.durationSeconds ?? 0)
         isPlaying = true
@@ -184,6 +194,7 @@ final class AudioEngine: ObservableObject {
                 self.currentTime = time.seconds
                 self.updateNowPlayingTime()
                 self.savePositionThrottled()
+                self.emitFinishedIfNearEnd()
             }
         }
     }
@@ -215,8 +226,35 @@ final class AudioEngine: ObservableObject {
         }
     }
 
+    /// Whether a position counts as having finished the episode. A duration of
+    /// 0 means the length is not known yet, which must never count as finished
+    /// — otherwise an episode would archive itself the moment it was opened.
+    static func countsAsFinished(currentTime: Double, duration: Double) -> Bool {
+        guard duration > 0, currentTime > 0 else { return false }
+        return duration - currentTime <= finishedThreshold
+    }
+
+    /// Reports the current episode as listened once it is within a minute of
+    /// the end. Fires once per playthrough; a duration of 0 means we never
+    /// learned the length, so the natural end-of-track is the only signal.
+    private func emitFinishedIfNearEnd() {
+        guard
+            let item = currentItem,
+            !finishedIds.contains(item.id),
+            Self.countsAsFinished(currentTime: currentTime, duration: duration)
+        else { return }
+        finishedIds.insert(item.id)
+        finished.send(item)
+    }
+
     /// Called when a track finishes: clear its saved position and start the next.
     private func advance() {
+        if let item = currentItem, !finishedIds.contains(item.id) {
+            // Reached the end without ever crossing the threshold — an episode
+            // shorter than a minute, or one whose duration we never knew.
+            finishedIds.insert(item.id)
+            finished.send(item)
+        }
         if let finished = currentItem { clearPosition(for: finished.id) }
         currentTime = 0
 
